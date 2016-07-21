@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <sys/xattr.h>
+#include <attr/xattr.h>
 #include <sys/errno.h>
 #include <unistd.h>
 #include <string.h>
@@ -116,7 +116,7 @@ void update_evict_queue(ev_q *evict_queue) {
     int i = 0;
     while (file_list[i] != NULL && i < evict_queue->max_size) {
 
-        time_t now = time(NULL); /* get system time */
+        time_t now = time (NULL); /* get system time */
         if (now >= file_access_time(ORANGEFS_CLIENT_ROOT_DIRECTORY, file_list[i]) + EVICT_SESSION_TIMEOUT) {
             ev_q_push(evict_queue, ev_n_alloc(ORANGEFS_CLIENT_ROOT_DIRECTORY, file_list[i]));
         }
@@ -136,7 +136,7 @@ void move_file_to_tier_hot(const char *cold_path, const char *hot_path) {
     rename(cold_path, hot_path);
 }
 
-void try_evict_files(ev_q *evict_queue) {    
+void try_evict_files(ev_q *evict_queue) {
     while (evict_queue->size > 0) {
         ev_n *node = ev_q_front(evict_queue);
 
@@ -166,33 +166,36 @@ int pull_file_data(const char *path) {
     return 0;
 }
 
-int dummy(const char *path) {
-    int is_dummy = 0;
-    int rc = getxattr(path, "dummy", &is_dummy, sizeof(is_dummy));
-    if (rc < 0) {
-        error("error getting 'cold_id' attribute for '%s' file (rc: %d, errno: %d)", path, rc, errno);
-        return errno;
+int is_dummy(const char *path) {
+    ssize_t dummy_attr_size = getxattr(path, "is_dummy", NULL, 0);
+
+    if (dummy_attr_size > 0) {
+      return 1;
+    } else if (dummy_attr_size < 0) {
+      error("error getting 'is_dummy' attribute for '%s' file (errno: %d)", path, errno);
     }
-    debug("FILE '%s' | XATTR 'user.is_dummy':'%i'", path, is_dummy);
-    return 1;
+
+    return 0;
 }
 
 int load_file_data(const char *path) {
-    if (dummy(path)) {
+    if (is_dummy(path)) {
         /* file is dummy; need to pull its data from the cold tier */
         char cold_id[1024]; /* TODO: consider changing array size to something else */
         memset(cold_id, 0, sizeof(cold_id));
 
-        int rc = getxattr(path, "cold_id", &cold_id, sizeof(cold_id));
-        if (rc < 0) {
-            error("error getting 'cold_id' attribute for '%s' file (rc: %d, errno: %d)", path, rc, errno);
+	/* when 'size' parameter set to 0 for getxattr, size in bytes for attribute value is returned */
+	ssize_t cold_id_size = getxattr(path, "cold_id", NULL, 0);
+
+        if (getxattr(path, "cold_id", &cold_id, cold_id_size)) {
+            error("error getting 'cold_id' attribute for '%s' file (errno: %d)", path, errno);
             return errno;
         }
         debug("FILE '%s' | XATTR 'cold_id':'%s'", path, cold_id);
 
         /* actually pull file data from cold tier */
-        if ((rc = pull_file_data(cold_id))) {
-            error("error pulling file data from cold tier (rc: %d, errno: %d)", rc, errno);
+        if (pull_file_data(cold_id)) {
+            error("error pulling file data from cold tier (errno: %d)", rc, errno);
             return errno;
         }
     } else {
@@ -267,14 +270,8 @@ int main(int argc, char *argv[]) {
 
         debug("eviction is %sactive; occupied space rate: %2.2f%%", (evict_active ? "" : "in"), occ_sp_rt * 100);
         if (evict_active) {
-            //update_evict_queue(evict_queue);
-            //try_evict_files(evict_queue);
-            char val[30]; memset(val, 0, sizeof(val));
-            int rc;
-            rc = setxattr("/mnt/orangefs/file3", "user.cold_id", "aws-id", sizeof("aws-id"), XATTR_REPLACE);
-            info("errno %d", errno);
-            getxattr("/mnt/orangefs/file3", "user.cold_id", &val, sizeof(val));
-            info("user.cold_id: %s", val);
+            update_evict_queue(evict_queue);
+            try_evict_files(evict_queue);
         }
 
         /* calculating time to sleep before next evict session */
@@ -287,3 +284,6 @@ int main(int argc, char *argv[]) {
 
     return EXIT_SUCCESS;
 }
+
+
+
