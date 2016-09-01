@@ -13,7 +13,7 @@
 #include "evict-queue.h"
 #include "memory.h"
 #include "log.h"
-#include "config.h"
+#include "conf.h"
 #include "tier-engine.h"
 
 /**

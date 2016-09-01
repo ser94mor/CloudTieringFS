@@ -34,5 +34,7 @@ typedef struct __conf conf_t;
 
 const conf_t conf;
 
+int readconf(const char *conf_path);
+
 #endif // CONF_H
 
