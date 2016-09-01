@@ -2,6 +2,8 @@
 #define EVICT_QUEUE_H
 
 #include <sys/types.h>
+#include <linux/fs.h>
+#include <linux/limits.h>
 
 struct __evict_node {
     const char *dir_name;
@@ -35,5 +37,21 @@ void ev_n_free(ev_n *node);
 
 const char *ev_q_str(ev_q *queue);
 
+// NEW CODE BELOW
+
+struct __file_path {
+    const char name[NAME_MAX];
+    const size_t len;
+    const struct file_path *ancestor;
+    const size_t depth;
+    const int is_leaf;
+
+};
+
+/*
+ * Directory depth value cannot be more then PATH_MAX / 2 because
+ * path that has a maximum depth is /a/a/a/.../a (consists 1-letter name for each depth)
+ */
+const char *depth_file_path_map[PATH_MAX / 2];
 
 #endif // EVICT_QUEUE_H

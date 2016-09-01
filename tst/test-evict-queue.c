@@ -2,7 +2,7 @@
 #include <stdlib.h>
 
 #include "evict-queue.h"
-#include "config.h"
+#include "conf.h"
 
 void print_ev_q_info(ev_q *queue) {
     printf("  [queue info]\n");

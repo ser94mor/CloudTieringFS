@@ -98,12 +98,12 @@ void update_file_list(const char *dir_path, const char *file_list[], size_t file
         char msg[256] = "Couldn't open the directory ";
         strcat(msg, dir_path);
 
-        perror(msg);
+        log(ERROR, msg);
     }
 }
 
 void update_evict_queue(ev_q *evict_queue) {
-    info("updating evict queue...");
+    log(INFO, "updating evict queue...");
 
     /* get list of files in root orangefs directory */
     const char *file_list[evict_queue->max_size];
@@ -127,12 +127,13 @@ void update_evict_queue(ev_q *evict_queue) {
 }
 
 void move_file_to_tier_cold(const char *hot_path, const char *cold_path) {
-    debug("|HOT -> COLD| : { %s -> %s }", hot_path, cold_path);
+    log(DEBUG, "|HOT -> COLD| : { %s -> %s }", hot_path, cold_path);
+
     rename(hot_path, cold_path);
 }
 
 void move_file_to_tier_hot(const char *cold_path, const char *hot_path) {
-    debug("|COLD -> HOT| : { %s -> %s }", cold_path, hot_path);
+    log(DEBUG, "|COLD -> HOT| : { %s -> %s }", cold_path, hot_path);
     rename(cold_path, hot_path);
 }
 
@@ -172,7 +173,7 @@ int is_dummy(const char *path) {
     if (dummy_attr_size > 0) {
       return 1;
     } else if (dummy_attr_size < 0) {
-      error("error getting 'is_dummy' attribute for '%s' file (errno: %d)", path, errno);
+      log(ERROR, "error getting 'is_dummy' attribute for '%s' file (errno: %d)", path, errno);
     }
 
     return 0;
@@ -188,14 +189,14 @@ int load_file_data(const char *path) {
 	ssize_t cold_id_size = getxattr(path, "cold_id", NULL, 0);
 
         if (getxattr(path, "cold_id", &cold_id, cold_id_size)) {
-            error("error getting 'cold_id' attribute for '%s' file (errno: %d)", path, errno);
+            log(ERROR, "error getting 'cold_id' attribute for '%s' file (errno: %d)", path, errno);
             return errno;
         }
-        debug("FILE '%s' | XATTR 'cold_id':'%s'", path, cold_id);
+        log(DEBUG, "FILE '%s' | XATTR 'cold_id':'%s'", path, cold_id);
 
         /* actually pull file data from cold tier */
         if (pull_file_data(cold_id)) {
-            error("error pulling file data from cold tier (errno: %d)", rc, errno);
+            log(ERROR, "error pulling file data from cold tier (errno: %d)", rc, errno);
             return errno;
         }
     } else {
@@ -225,6 +226,9 @@ int update_config(config_t *config) {
     config->stop_ev_rate = STOP_EVICT_SPACE_RATE_LIMIT;
     config->ev_q_max_size = EVICT_QUEUE_MAX_SIZE;
     config->log_level = DEBUG;
+    config->tier_type[0] = ORANFEFS_TIER_TYPE;
+    config->tier_type[1] = S3_TIER_TYPE;
+
 
     config->cold_tier_dir = TIER_COLD_HIDDEN_DIR;        /* temporary */
     config->cold_tier_dir_mode = ORANGEFS_CLIENT_ROOT_DIRECTORY_MODE;  /* temporary */
@@ -239,7 +243,7 @@ int update_config(config_t *config) {
  */
 int prepare(config_t *config) {
     if (update_config(config)) {
-        error("unable to update configuration; terminate");
+        log(ERROR, "unable to update configuration; terminate");
         return 1;
     }
 
@@ -248,7 +252,7 @@ int prepare(config_t *config) {
 }
 
 int main(int argc, char *argv[]) {
-    info("start tier-engine");
+    log(INFO, "start tier-engine");
 
     config_t config;
 
@@ -262,13 +266,13 @@ int main(int argc, char *argv[]) {
     unsigned int evict_active = 0; /* default: eviction is inactive */
     while (1) {
         const time_t start_time = time(NULL);
-        debug("start next evict session");
+        log(DEBUG, "start next evict session");
 
         occ_sp_rt = occupied_space_rate();
         evict_active = (evict_active && occ_sp_rt >= config.stop_ev_rate) ||
                        (!evict_active && occ_sp_rt >= config.start_ev_rate);
 
-        debug("eviction is %sactive; occupied space rate: %2.2f%%", (evict_active ? "" : "in"), occ_sp_rt * 100);
+        log(DEBUG, "eviction is %sactive; occupied space rate: %2.2f%%", (evict_active ? "" : "in"), occ_sp_rt * 100);
         if (evict_active) {
             update_evict_queue(evict_queue);
             try_evict_files(evict_queue);
@@ -278,7 +282,7 @@ int main(int argc, char *argv[]) {
         const time_t stop_time = time(NULL);
         const double diff_time = difftime(config.ev_session_tm, (time_t)difftime(stop_time, start_time));
         const double sleep_time = diff_time >= 0.0 ? diff_time : 0.0;
-        debug("evict session finished; sleep %.f seconds", sleep_time);
+        log(DEBUG, "evict session finished; sleep %.f seconds", sleep_time);
         sleep(sleep_time);
     }
 
