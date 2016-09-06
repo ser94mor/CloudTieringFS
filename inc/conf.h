@@ -23,7 +23,6 @@ struct __conf {
     double stop_ev_rate;       /* stop evicting files when storage is (stop_ev_rate * 100)% full */
     size_t ev_q_max_size;      /* maximum size of evict queue */
     unsigned int log_level;    /* current log level */
-    unsigned int tier_type[2]; /* array of tier types */
 
     char *cold_tier_dir;        /* temporary */
     mode_t cold_tier_dir_mode;  /* temporary */
@@ -32,9 +31,8 @@ struct __conf {
 
 typedef struct __conf conf_t;
 
-const conf_t conf;
-
 int readconf(const char *conf_path);
+conf_t getconf();
 
 #endif // CONF_H
 

@@ -3,9 +3,15 @@
 #include <stddef.h>
 #include <string.h>
 #include <limits.h>
+#include <ctype.h>
 
-#include "log.h"
 #include "conf.h"
+
+const conf_t conf;
+
+conf_t *getconf() {
+        return &conf;
+}
 
 /**
  * @brief init_default_conf Initializes configuration with default values.
@@ -17,8 +23,6 @@ static void init_default_conf() {
     conf.stop_ev_rate = STOP_EVICT_SPACE_RATE_LIMIT;
     conf.ev_q_max_size = EVICT_QUEUE_MAX_SIZE;
     conf.log_level = DEBUG;
-    conf.tier_type[0] = ORANFEFS_TIER_TYPE;
-    conf.tier_type[1] = S3_TIER_TYPE;
 
 
     conf.cold_tier_dir = TIER_COLD_HIDDEN_DIR;        /* temporary */

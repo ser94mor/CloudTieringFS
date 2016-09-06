@@ -1,40 +1,11 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <ftw.h>
 #include <syslog.h>
 #include <dotconf.h>
 
-/*
- * Variables and functions needed for reading configuration files.
- */
-static DOTCONF_CB(cb_list);
-static DOTCONF_CB(cb_str);
-
-static const configoption_t options[] = {
-        {"ExampleStr", ARG_STR, cb_str, NULL, CTX_ALL},
-        {"ExampleList", ARG_LIST, cb_list, NULL, CTX_ALL},
-        LAST_OPTION
-};
-
-DOTCONF_CB(cb_list)
-{
-        int i;
-        printf("%s:%ld: %s: [  ",
-               cmd->configfile->filename, cmd->configfile->line, cmd->name);
-        for (i = 0; i < cmd->arg_count; i++)
-                printf("(%d) %s  ", i, cmd->data.list[i]);
-        printf("]\n");
-        return NULL;
-}
-
-DOTCONF_CB(cb_str)
-{
-        printf("%s:%ld: %s: [%s]\n",
-               cmd->configfile->filename, cmd->configfile->line,
-               cmd->name, cmd->data.str);
-        return NULL;
-}
-
+#include "conf.h"
 
 int main(int argc, char *argv[]) {
         /* open connection to syslog */
@@ -50,7 +21,7 @@ int main(int argc, char *argv[]) {
         configfile_t *configfile = dotconf_create(argv[1], options, NULL, CASE_INSENSITIVE);
         if (!configfile) {
                 syslog(LOG_ERR, "unable to proceed further due to configuration read failure");
-                return EXIT_FAILURE;
+                exit(EXIT_FAILURE);
         }
 
         if (dotconf_command_loop(configfile) == 0)
@@ -65,5 +36,5 @@ int main(int argc, char *argv[]) {
 
         LOG(INFO, "file system monitor successfully started");
 
-        return EXIT_SUCCESS;
+        exit(EXIT_SUCCESS);
 }
