@@ -4,25 +4,12 @@
 #include <string.h>
 #include <limits.h>
 #include <ctype.h>
+#include <time.h>
 #include <dotconf.h>
 
 #include "conf.h"
 
 static conf_t *conf = NULL;
-
-typedef struct {
-    char   fs_mount_point[PATH_MAX];      /* filesystem's root directory */
-    time_t ev_session_tm;                 /* the lowest time interval between evict sessions */
-    double ev_start_rate;                 /* start evicting files when storage is (start_ev_rate * 100)% full */
-    double ev_stop_rate;                  /* stop evicting files when storage is (stop_ev_rate * 100)% full */
-    size_t ev_q_max_size;                 /* maximum size of evict queue */
-} conf_t;
-
-FsMountPoint           /mnt/orangefs
-EvictSessionTimeout    60
-EvictStartRate         0.7
-EvictStopRate          0.6
-EvictQueueMaxSize      128
 
 static DOTCONF_CB(fs_mount_point);
 static DOTCONF_CB(ev_session_tm);
@@ -39,11 +26,38 @@ static const configoption_t options[] = {
         LAST_OPTION
 };
 
+static DOTCONF_CB(fs_mount_point) {
+        strcpy(conf->fs_mount_point, cmd->data.str);
+        return NULL;
+}
+
+static DOTCONF_CB(ev_session_tm) {
+        conf->ev_session_tm = (time_t)cmd->data.value;
+        return NULL;
+}
+
+static DOTCONF_CB(ev_start_rate) {
+        conf->ev_start_rate = (double)cmd->data.dvalue;
+        return NULL;
+}
+
+static DOTCONF_CB(ev_stop_rate) {
+        conf->ev_stop_rate = (double)cmd->data.dvalue;
+        return NULL;
+}
+
+static DOTCONF_CB(ev_q_max_size) {
+        conf->ev_q_max_size = (size_t)cmd->data.value;
+        return NULL;
+}
+
+/**
+ * @brief getconf Get pointer to configuration.
+ * @return Pointer to conf_t or NULL if readconf has not been invoked yet.
+ */
 inline conf_t *getconf() {
         return conf;
 }
-
-
 
 /**
  * @brief readconf Read configuration from file.
@@ -53,11 +67,9 @@ inline conf_t *getconf() {
  * @return 0 on success, non-0 on failure.
  */
 int readconf(const char *conf_path) {
-    if (conf_path == NULL) {
-        return EXIT_SUCCESS; /* NULL indicates default configuration */
-    }
+        conf = (conf_t *)malloc(sizeof(conf_t));
 
-    FILE *stream;
+        FILE *stream;
 
     stream = fopen(conf_path, "r");
     if (!stream) {
