@@ -4,125 +4,46 @@
 #include <string.h>
 #include <limits.h>
 #include <ctype.h>
+#include <dotconf.h>
 
 #include "conf.h"
 
-const conf_t conf;
+static conf_t *conf = NULL;
 
-conf_t *getconf() {
-        return &conf;
+typedef struct {
+    char   fs_mount_point[PATH_MAX];      /* filesystem's root directory */
+    time_t ev_session_tm;                 /* the lowest time interval between evict sessions */
+    double ev_start_rate;                 /* start evicting files when storage is (start_ev_rate * 100)% full */
+    double ev_stop_rate;                  /* stop evicting files when storage is (stop_ev_rate * 100)% full */
+    size_t ev_q_max_size;                 /* maximum size of evict queue */
+} conf_t;
+
+FsMountPoint           /mnt/orangefs
+EvictSessionTimeout    60
+EvictStartRate         0.7
+EvictStopRate          0.6
+EvictQueueMaxSize      128
+
+static DOTCONF_CB(fs_mount_point);
+static DOTCONF_CB(ev_session_tm);
+static DOTCONF_CB(ev_start_rate);
+static DOTCONF_CB(ev_stop_rate);
+static DOTCONF_CB(ev_q_max_size);
+
+static const configoption_t options[] = {
+        { "FsMountPoint",        ARG_STR,    fs_mount_point, NULL, CTX_ALL },
+        { "EvictSessionTimeout", ARG_INT,    ev_session_tm,  NULL, CTX_ALL },
+        { "EvictStartRate",      ARG_DOUBLE, ev_start_rate,  NULL, CTX_ALL },
+        { "EvictStopRate",       ARG_DOUBLE, ev_stop_rate,   NULL, CTX_ALL },
+        { "EvictQueueMaxSize",   ARG_INT,    ev_q_max_size,  NULL, CTX_ALL },
+        LAST_OPTION
+};
+
+inline conf_t *getconf() {
+        return conf;
 }
 
-/**
- * @brief init_default_conf Initializes configuration with default values.
- */
-static void init_default_conf() {
-    conf.fs_root_dir = ORANGEFS_CLIENT_ROOT_DIRECTORY;
-    conf.ev_session_tm = EVICT_SESSION_TIMEOUT;
-    conf.start_ev_rate = START_EVICT_SPACE_RATE_LIMIT;
-    conf.stop_ev_rate = STOP_EVICT_SPACE_RATE_LIMIT;
-    conf.ev_q_max_size = EVICT_QUEUE_MAX_SIZE;
-    conf.log_level = DEBUG;
 
-
-    conf.cold_tier_dir = TIER_COLD_HIDDEN_DIR;        /* temporary */
-    conf.cold_tier_dir_mode = ORANGEFS_CLIENT_ROOT_DIRECTORY_MODE;  /* temporary */
-    conf.evict_session_sleep = EVICT_SESSION_SLEEP; /* temporary */
-}
-
-static int init_conf_struct_member(const char *key, const char *val, const size_t val_len) {
-    if (!strcmp("fs_root_dir", key)) {
-        conf.fs_root_dir = (char *)malloc(sizeof(char) * (val_len + 1));
-        strcpy(conf.fs_root_dir, val);
-    } else if (!strcmp("ev_session_tm", key)) {
-        conf.ev_session_tm = strto
-    }
-}
-
-/**
- * @brief parse_conf_file Parses configuration file. Assigns found key-value pairs
- *                        to the appropriate records in conf_t configuration.
- * @param stream Opened FILE stream.
- * @return 0 on success, non-0 on failure.
- */
-static int parse_conf_file(FILE *stream) {
-    char buf[LINE_MAX]; /* buffer to hold line containing key-value pair */
-    int key[2];         /* first element - begining offset; last - length */
-    int val[2];
-
-    while (!fgets(buf, LINE_MAX, stream)) {
-        key[0] = key[1] = -1;
-        val[0] = val[1] = -1;
-        int i = 0;
-        while (buf[i] != '\0') {
-            if (isgraph(buf[i])) {
-                if (key[0] == -1) {
-                    key[0] = i;
-                    if (!isgraph(buf[i + 1])) {
-                        key[1] = 1;
-                    }
-                } else if (key[1] == -1 && !isgraph(buf[i + 1])) {
-                    key[1] = i - key[0];
-                } else if (val[0] == -1) {
-                    val[0] = i;
-                    if (!isgraph(buf[i + 1])) {
-                        val[1] = 1;
-                        break;
-                    }
-                } else if (val[1] == -1 && !isgraph(buf[i + 1])) {
-                    val[1] = i - val[0];
-                    break;
-                }
-            }
-
-            ++i;
-            continue;
-        }
-
-        /* ensure that the string was correct */
-        if (key[0] == -1) {
-            /* empty line */
-            continue;
-        }
-
-        char key_str[key[1] + 1];
-        strncpy(key_str, buf + key[0], key[1]);
-        key_str[key[1]] = '\0';
-
-        if (val[0] == -1) {
-            /* no value specified */
-            LOG(ERROR, "no value specified for configuration parameter '%s'", key_str);
-            return EXIT_FAILURE;
-        }
-
-        char val_str[val[1] + 1];
-        strncpy(val_str, buf + val[0], val[1]);
-        val_str[val[1]] = '\0';
-
-        if (init_conf_struct_member(key_str, val_str, val[1])) {
-            return EXIT_FAILURE;
-        }
-    }
-
-    return EXIT_SUCCESS;
-}
-
-int parse_conf_file(FILE * stream) {
-    char buf[LINE_MAX]; /* buffer to hold line containing key-value pair */
-
-    while (!fgets(buf, LINE_MAX, stream)) {
-        const char *delim = " \t\n";
-
-        char *key = strtok(buf, delim);
-        char *val = strok(NULL, delim);
-
-        if (init_conf_struct_member(key_str, val_str, val[1])) {
-            return EXIT_FAILURE;
-        }
-    }
-
-    return EXIT_SUCCESS;
-}
 
 /**
  * @brief readconf Read configuration from file.
@@ -132,9 +53,6 @@ int parse_conf_file(FILE * stream) {
  * @return 0 on success, non-0 on failure.
  */
 int readconf(const char *conf_path) {
-    /* initialize configuration with default values to avoid non-initialized conf_t members */
-    init_default_conf();
-
     if (conf_path == NULL) {
         return EXIT_SUCCESS; /* NULL indicates default configuration */
     }

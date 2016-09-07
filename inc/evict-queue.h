@@ -3,20 +3,17 @@
 
 #include <sys/types.h>
 
-struct __evict_node {
+typedef struct {
     const char *file_name;
-    struct __evict_node *next;
-};
+    ev_n *next;
+} ev_n;
 
-struct __evict_queue {
-    struct __evict_node *head;
-    struct __evict_node *tail;
+typedef struct {
+    ev_n *head;
+    ev_n *tail;
     size_t size;
     size_t max_size;
-};
-
-typedef struct __evict_node ev_n;
-typedef struct __evict_queue ev_q;
+} ev_q;
 
 int ev_q_empty(ev_q *queue);
 
