@@ -2,8 +2,8 @@
 #define CONF_H
 
 #include <stddef.h>
-#include <limits.h>
 #include <time.h>
+#include <linux/limits.h>
 
 typedef struct {
     char   fs_mount_point[PATH_MAX];      /* filesystem's root directory */

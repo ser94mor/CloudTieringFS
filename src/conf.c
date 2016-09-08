@@ -69,24 +69,18 @@ inline conf_t *getconf() {
 int readconf(const char *conf_path) {
         conf = (conf_t *)malloc(sizeof(conf_t));
 
-        FILE *stream;
+        configfile_t *configfile;
 
-    stream = fopen(conf_path, "r");
-    if (!stream) {
-        LOG(ERROR, "%s", strerror(errno));
-        return EXIT_FAILURE;
-    }
+        configfile = dotconf_create((char *)conf_path, options, NULL, NONE);
+        if (!configfile) {
+                return 1;
+        }
 
-    int ret = parse_conf_file(stream);
+        if (dotconf_command_loop(configfile) == 0) {
+                return 1;
+        }
 
-    if (fclose(stream)) {
-        /* failure of fclose often indicates some serious error */
-        LOG(ERROR, "%s", strerror(errno));
-        return EXIT_FAILURE;
-    }
+        dotconf_cleanup(configfile);
 
-    if (ret) {
-        /* parsing error */
-        return EXIT_FAILURE;
-    }
+        return 0;
 }
