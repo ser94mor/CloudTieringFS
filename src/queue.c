@@ -29,6 +29,7 @@ int queue_full(queue_t *queue) {
 
 /**
  * @brief queue_push Push item into queue if there is enough place for this item.
+ * @note TODO: use mutex syncronization !!!
  * @return 0 on sussess; <0 on failure
  */
 int queue_push(queue_t *queue, void *item, size_t item_size) {
@@ -37,39 +38,35 @@ int queue_push(queue_t *queue, void *item, size_t item_size) {
             queue->cur_q_size == queue->max_q_size) {
                 return -1;
         }
-
-        // TODO: rewrite using modulo
-        if ((queue->tail + item_size + sizeof(size_t)) <= (queue->buffer + queue->buffer_size)) {
-                memcpy(queue->tail, &item_size, sizeof(size_t));
-                queue->tail += sizeof(size_t);
-                memcpy(queue->tail, item, item_size);
-                queue->tail += item_size;
-        } else {
-                size_t bytes_left = (queue->buffer + queue->buffer_size) - queue->tail;
-                size_t bytes_right = item_size + sizeof(size_t) - bytes_left;
-
-                /* write size of item */
-                if (sizeof(size_t) >= bytes_left) {
-                        memcpy(queue->tail, &item_size, bytes_left);
-                        queue->tail = queue->buffer;
-                        memcpy(queue->tail, (void *)&item_size + bytes_left, sizeof(size_t) - bytes_left);
-                        queue->tail += sizeof(size_t) - bytes_left;
-                        memcpy(queue->tail, item, item_size);
-                        queue->tail += item_size;
-                } else {
-                        memcpy(queue->tail, &item_size, sizeof(size_t));
-                        queue->tail += sizeof(size_t);
-                        memcpy(queue->tail, item, bytes_left - sizeof(size_t));
-                        queue->tail = queue->buffer;
-                        memcpy(queue->tail, item + (bytes_left - sizeof(size_t)), bytes_right);
-                        queue->tail += bytes_right;
-                }
-        }
+        
+        /* to maximize speed use very greedy memory policy */
+        void *ptr = queue->tail == (queue->buffer + queue->buffer_size) ? queue->buffer : queue->tail;
+        memcpy(ptr, &item_size, sizeof(size_t));
+        memcpy(ptr + sizeof(size_t), item, item_size);
+        
+        queue->tail = ptr + sizeof(size_t) + queue->max_item_size;
+        queue->cur_q_size++;
 
         return 0;
 }
 
-void queue_pop(ev_q *queue);
+/**
+ * @brief queue_pop Pop item from queue if queue is not empty.
+ * @note TODO: use mutex syncronization !!!
+ * @return 0 it item was popped; <0 if queue is NULL or queue is empty
+ */
+int queue_pop(ev_q *queue) {
+        if (queue == NULL || queue->cur_q_size == 0) {
+                return -1;
+        }
+                
+        queue->head = queue->head == (queue->buffer + queue->buffer_size) ? 
+                          queue->buffer + queue->max_item_size + sizeof(size_t) : 
+                          queue->head + queue->max_item_size + sizeof(size_t);
+        queue->cur_q_size--;
+        
+        return 0;
+}
 
 void *queue_front(queue_t *q, size_t *size);
 void *queue_back(queue_t *q, size_t *size);
