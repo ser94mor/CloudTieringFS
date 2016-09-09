@@ -24,8 +24,10 @@ int main(int argc, char *argv[]) {
                 exit(EXIT_FAILURE);
         }
 
-        if (dotconf_command_loop(configfile) == 0)
-                fprintf(stderr, "Error reading config file\n");
+        if (dotconf_command_loop(configfile) == 0) {
+                syslog(LOG_ERR, "error while reading configuration file");
+                exit(EXIT_FAILURE);
+        }
 
         dotconf_cleanup(configfile);
 
