@@ -38,12 +38,12 @@ int queue_push(queue_t *queue, void *item, size_t item_size) {
             queue->cur_q_size == queue->max_q_size) {
                 return -1;
         }
-        
+
         /* to maximize speed use very greedy memory policy */
         void *ptr = queue->tail == (queue->buffer + queue->buffer_size) ? queue->buffer : queue->tail;
         memcpy(ptr, &item_size, sizeof(size_t));
         memcpy(ptr + sizeof(size_t), item, item_size);
-        
+
         queue->tail = ptr + sizeof(size_t) + queue->max_item_size;
         queue->cur_q_size++;
 
@@ -59,91 +59,25 @@ int queue_pop(ev_q *queue) {
         if (queue == NULL || queue->cur_q_size == 0) {
                 return -1;
         }
-                
-        queue->head = queue->head == (queue->buffer + queue->buffer_size) ? 
-                          queue->buffer + queue->max_item_size + sizeof(size_t) : 
+
+        queue->head = queue->head == (queue->buffer + queue->buffer_size) ?
+                          queue->buffer + queue->max_item_size + sizeof(size_t) :
                           queue->head + queue->max_item_size + sizeof(size_t);
         queue->cur_q_size--;
-        
+
         return 0;
 }
 
-void *queue_front(queue_t *q, size_t *size);
-void *queue_back(queue_t *q, size_t *size);
-
-queue_t *queue_alloc(size_t max_q_size, size_t max_item_size);
-void queue_free(queue_t *q);
-
-const char *queue_str(queue_t *q);
-
-
-/**
- * @brief ev_q_push Implementation of "push" queue method.
- * @return 0 on success; <0
- */
-int ev_q_push(ev_q *queue, size_t item_size, void *item) {
-    if (queue == NULL || node == NULL) {
-        return -1;
-    }
-
-    if (queue->size == 0) {
-        queue->head = node;
-    } else {
-        queue->tail->next = node;
-    }
-
-    queue->tail = node;
-    node->next = NULL;
-    (queue->size)++;
+void *queue_front(queue_t *queue, size_t *size) {
+        size = queue->head;
+        return queue->head + sizeof(size_t);
 }
 
 /**
- * Implementation of "pop" queue method.
+ * @brief queue_alloc Allocates memory for a queue and initializes max_q_size with the given value.
+ * @return Pointer to initialized queue_t.
  */
-void ev_q_pop(ev_q *queue) {
-    if (queue == NULL || queue->size == 0) {
-        return;
-    }
-
-    ev_n *node = queue->head;
-    queue->head = queue->head->next;
-    (queue->size)--;
-
-    if (queue->size == 0) {
-        queue->head = NULL;
-        queue->tail = NULL;
-    }
-
-    ev_n_free(node);
-}
-
-/**
- * Implementation of "front" queue operation.
- */
-char *ev_q_front(ev_q *queue) {
-    if (queue == NULL) {
-        return NULL;
-    }
-
-    return queue->head;
-}
-
-/**
- * Implementation of "back" queue operation.
- */
-char *ev_q_back(ev_q *queue) {
-    if (queue == NULL) {
-        return NULL;
-    }
-
-    return queue->tail;
-}
-
-/**
- * @brief ev_q_alloc Allocates memory for ev_q and initializes max_size with the given value.
- * @return Pointer to initialized ev_q structure.
- */
-ev_q *ev_q_alloc(size_t max_q_size, size_t max_item_size) {
+queue_t *queue_alloc(size_t max_q_size, size_t max_item_size) {
         /* allocate memory for ev_q data structure */
         queue_t *queue = (queue_t *)malloc(sizeof(queue_t));
         queue->max_q_size = max_q_size;
@@ -159,9 +93,9 @@ ev_q *ev_q_alloc(size_t max_q_size, size_t max_item_size) {
 }
 
 /**
- * @brief Frees all memory allocated for the given ev_q pointer.
+ * @brief queue_free Frees all memory allocated for the given queue.
  */
-void ev_q_free(ev_q *queue) {
+void queue_free(queue_t *queue) {
     if (queue == NULL) {
         return;
     }
@@ -169,6 +103,10 @@ void ev_q_free(ev_q *queue) {
     free(queue->buffer);
     free(queue->splitted_item);
     free(queue);
+}
+
+const char *queue_str(queue_t *queue) {
+        
 }
 
 /**

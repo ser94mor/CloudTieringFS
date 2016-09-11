@@ -21,7 +21,7 @@ int queue_push(queue_t *q, void *item, size_t item_size);
 int queue_pop(queue_t *q);
 
 void *queue_front(queue_t *q, size_t *size);
-void *queue_back(queue_t *q, size_t *size);
+/* void *queue_back(queue_t *q, size_t *size); */
 
 queue_t *queue_alloc(size_t max_q_size, size_t max_item_size);
 void queue_free(queue_t *q);
