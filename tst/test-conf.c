@@ -33,7 +33,7 @@ static int create_test_conf_file() {
         return 0;
 }
 
-int test_readconf(char *err_msg) {
+int test_conf(char *err_msg) {
         if (create_test_conf_file()) {
                 strcpy(err_msg, "unable to create test configuration file");
                 return 1;

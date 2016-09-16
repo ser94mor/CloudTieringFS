@@ -7,7 +7,8 @@ static struct test_case {
         const char *name;
         int (*func)(char *);
 } test_suit[] = {
-        { "readconf", test_readconf }
+        { "conf", test_conf },
+        { "queue", test_queue }
 };
 
 int main(int argc, char *argv[]) {

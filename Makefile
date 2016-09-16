@@ -14,7 +14,7 @@ app: mkdir-bin
 test: test-suit
 
 test-suit: mkdir-bin
-	gcc ${CFLAGS} -ldotconf src/conf.c tst/test-conf.c tst/test-suit.c -o bin/test-suit
+	gcc ${CFLAGS} -ldotconf src/conf.c src/queue.c tst/test-conf.c tst/test-suit.c tst/test-queue.c -o bin/test-suit
 
 mkdir-bin:
 	mkdir -p bin/
