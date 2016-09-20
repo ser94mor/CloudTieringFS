@@ -43,7 +43,7 @@ int queue_push(queue_t *queue, char *item, size_t item_size) {
         }
 
         char *ptr = queue->tail == (queue->buffer + queue->buffer_size) ? queue->buffer : queue->tail;
-        
+
         memcpy(ptr, (char *)&item_size, sizeof(size_t));
         memcpy(ptr + sizeof(size_t), item, item_size);
 
@@ -119,27 +119,30 @@ void queue_free(queue_t *queue) {
  */
 void queue_print(FILE *stream, queue_t *queue) {
         char *q_ptr = queue->head;
-        
+
         char buf[queue->max_item_size + 1];
-        
+
         /* header */
         fprintf(stream, "queue:\n");
-        
+
         /* metadata */
         fprintf(stream, "\t< cur. queue size : %zu >\n"\
                         "\t< max. queue size : %zu >\n"\
                         "\t< max. item  size : %zu >\n"\
                         "\t< queue buf. size : %zu >\n",
-                queue->cur_q_size, queue->max_q_size, 
+                queue->cur_q_size, queue->max_q_size,
                 queue->max_item_size, queue->buffer_size);
-        
+
         /* data */
         while (q_ptr != queue->tail) {
-                memcpy(buf, q_ptr + sizeof(size_t), (size_t)q_ptr);
-                buf[(size_t)q_ptr] = '\0';
-                fprintf(stream, "\t|--> %zu %s \n", (size_t)q_ptr, buf);
-                q_ptr += sizeof(size_t) + (size_t)q_ptr;
+                if (q_ptr == (queue->buffer + queue->buffer_size)) {
+                        q_ptr = queue->buffer;
+                }
+                memcpy(buf, q_ptr + sizeof(size_t), (size_t)(*q_ptr));
+                buf[(size_t)(*q_ptr)] = '\0';
+                fprintf(stream, "\t|--> %zu %s \n", (size_t)(*q_ptr), buf);
+                q_ptr += sizeof(size_t) + queue->max_item_size;
         }
-        
+
         fflush(stream);
 }
