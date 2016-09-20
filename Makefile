@@ -1,23 +1,56 @@
+#
+# Single makefile to build all components of libcloudtiering
+#
 
-INC_TST += tst/
-SRCS += src/conf.c
-TST_SRCS += tst/test-suit.c \
-            tst/test-conf.c
+### names of produced artifacts
+APP_NAME ::= fs-monitor
+LIB_NAME ::= libcloudtiering
+TST_NAME ::= test-suit
 
-CFLAGS += -g -std=c11 -Wall -Iinc/
+### names of directories
+INC_DIR    ::= inc
+BIN_DIR    ::= bin
+SRC_DIR    ::= src
+APP_SUBDIR ::= app
+LIB_SUBDIR ::= lib
+TST_SUBDIR ::= tst
 
-all: app test
+### lists of source files
+LIB_SRC ::= $(wildcard ${SRC_DIR}/${LIB_SUBDIR}/*.c)
+APP_SRC ::= $(wildcard ${SRC_DIR}/${APP_SUBDIR}/*.c)
+TST_SRC ::= $(wildcard ${SRC_DIR}/${TST_SUBDIR}/*.c)
 
-app: mkdir-bin
-	gcc ${CFLAGS} ${SRCS} -o bin/fs-monitor
+### lists of produced objects
+LIB_OBJ ::= $(patsubst ${SRC_DIR}/${LIB_SUBDIR}/%.c,${BIN_DIR}/${LIB_SUBDIR}/%.o,${LIB_SRC})
+APP_OBJ ::= $(patsubst ${SRC_DIR}/${APP_SUBDIR}/%.c,${BIN_DIR}/${APP_SUBDIR}/%.o,${APP_SRC})
+TST_OBJ ::= $(patsubst ${SRC_DIR}/${TST_SUBDIR}/%.c,${BIN_DIR}/${TST_SUBDIR/}%.o,${TST_SRC})
 
-test: test-suit
+### list of linked external libraries
+LNK_LIB ::= dotconf
 
-test-suit: mkdir-bin
-	gcc ${CFLAGS} -ldotconf src/conf.c src/queue.c tst/test-conf.c tst/test-suit.c tst/test-queue.c -o bin/test-suit
 
-mkdir-bin:
-	mkdir -p bin/
+CC ::= gcc
+
+
+all: lib app test
+
+
+lib: mkdir-${BIN_DIR}/${LIB_SUBDIR} ${LIB_OBJ}
+	@echo "BUILDING lib"
+
+
+app: mkdir-${BIN_DIR}/${APP_SUBDIR} lib ${APP_OBJ}
+	gcc -l${BIN_DIR}/${LIB_NAME} -o ${APP_NAME}
+
+
+test: mkdir-${BIN_DIR}/${TST_SUBDIR} lib ${TST_OBJ}
+	gcc -l${BIN_DIR}/${LIB_NAME} -o${TST_NAME} ${TST_OBJ}
+
+${BIN_DIR}/%.o: ${SRC_DIR}/*/%.c
+	gcc -g -std=c11 -Wall $(addprefix -I,${INC_DIR}) $(addprefix -l,${LNK_LIB}) -c$< -o$@
+
+mkdir-%:
+	mkdir --parents $(subst mkdir-%,%,$@)
 
 clean:
-	rm -rf bin/
+	rm --recursive --force ${BIN_DIR}/
