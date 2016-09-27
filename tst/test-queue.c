@@ -49,23 +49,29 @@ int test_queue(char *err_msg) {
 
         ++i; /* increment item index */
         if (!queue_push(queue, item[i], strlen(item[i]))) {
-                strcpy(err_msg, "'queue_push' failed; queue should have returned error");
+                strcpy(err_msg, "'queue_push' failed; queue had to return error");
                 return 1;
         }
 
-        size_t it_sz = 0;
-        char *it = queue_front(queue, &it_sz);
+        for (int j = 0; j < QUEUE_MAX_SIZE - 1; j++) {
+                size_t it_sz = 0;
+                char *it = queue_front(queue, &it_sz);
 
-        printf("foo: %uz\n", it_sz);
-        if (strcmp(item[0], it) || it_sz != (strlen(item[0]) + 1)) {
-                strcpy(err_msg, "'queue_front' failed; wrong return result");
-                return 1;
+                if (strcmp(item[j], it) || it_sz != (strlen(item[j]) + 1)) {
+                        strcpy(err_msg, "'queue_front' failed; wrong return result");
+                        return 1;
+                }
+
+                if (queue_pop(queue)) {
+                        strcpy(err_msg, "'queue_pop' failed; ordinary case");
+                        return 1;
+                }
         }
 
-        if (queue_pop(queue)) {
-                strcpy(err_msg, "'queue_pop' failed; ordinary case");
-                return 1;
+        for (; i < i + QUEUE_MAX_SIZE - 1; i++) {
+                
         }
+
 
         queue_print(stdout, queue);
 

@@ -77,7 +77,7 @@ int queue_pop(queue_t *queue) {
  * @return Pointer to head queue element.
  */
 char *queue_front(queue_t *queue, size_t *size) {
-        size = (size_t *)queue->head;
+        *size = (size_t)(*queue->head);
         return queue->head + sizeof(size_t);
 }
 
