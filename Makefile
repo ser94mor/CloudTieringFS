@@ -5,7 +5,7 @@
 ### names of produced artifacts and versions
 VERSION  ::= 0.1
 APP_NAME ::= fs-monitor
-LIB_NAME ::= libcloudtiering
+LIB_SONAME ::= libcloudtiering.so
 TST_NAME ::= test-suit
 
 ### names of directories
