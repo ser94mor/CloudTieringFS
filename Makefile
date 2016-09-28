@@ -2,7 +2,8 @@
 # Single makefile to build all components of libcloudtiering
 #
 
-### names of produced artifacts
+### names of produced artifacts and versions
+VERSION  ::= 0.1
 APP_NAME ::= fs-monitor
 LIB_NAME ::= libcloudtiering
 TST_NAME ::= test-suit
@@ -43,8 +44,8 @@ app: mkdir-${BIN_DIR}/${APP_SUBDIR} lib ${APP_OBJ}
 	gcc -l${BIN_DIR}/${LIB_NAME} -o ${APP_NAME}
 
 
-test: mkdir-${BIN_DIR}/${TST_SUBDIR} lib ${TST_OBJ}
-	gcc -l${BIN_DIR}/${LIB_NAME} -o${TST_NAME} ${TST_OBJ}
+tst: mkdir-${BIN_DIR}/${TST_SUBDIR} lib ${TST_OBJ}
+	gcc $(addprefix -l,${LNK_LIB} ) -o${TST_NAME} ${TST_OBJ}
 
 ${BIN_DIR}/%.o: ${SRC_DIR}/*/%.c
 	gcc -g -std=c11 -Wall $(addprefix -I,${INC_DIR}) $(addprefix -l,${LNK_LIB}) -c$< -o$@
@@ -54,3 +55,7 @@ mkdir-%:
 
 clean:
 	rm --recursive --force ${BIN_DIR}/
+
+clean-%:
+	rm --recursive --force ${BIN_DIR}/$(subst clean-%,%,$@)
+
