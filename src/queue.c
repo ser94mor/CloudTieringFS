@@ -64,8 +64,8 @@ int queue_pop(queue_t *queue) {
                 return -1;
         }
 
-        queue->head = queue->head == (queue->buffer + queue->buffer_size) ?
-                          queue->buffer + queue->max_item_size + sizeof(size_t) :
+        queue->head = queue->head == (queue->buffer + queue->buffer_size - queue->max_item_size - sizeof(size_t)) ?
+                          queue->buffer :
                           queue->head + queue->max_item_size + sizeof(size_t);
         queue->cur_q_size--;
 
@@ -74,9 +74,14 @@ int queue_pop(queue_t *queue) {
 
 /**
  * @brief queue_front Returns pointer to head queue element and updates size of element varaible.
- * @return Pointer to head queue element.
+ * @return Pointer to head queue elementi or NULL if there are no elements.
  */
 char *queue_front(queue_t *queue, size_t *size) {
+        if (queue->cur_q_size == 0) {
+                *size = 0;
+                return NULL;
+        }
+
         *size = (size_t)(*queue->head);
         return queue->head + sizeof(size_t);
 }
@@ -123,7 +128,7 @@ void queue_print(FILE *stream, queue_t *queue) {
         char buf[queue->max_item_size + 1];
 
         /* header */
-        fprintf(stream, "queue:\n");
+        fprintf(stream, "QUEUE:\n");
 
         /* metadata */
         fprintf(stream, "\t< cur. queue size : %zu >\n"\
@@ -134,7 +139,8 @@ void queue_print(FILE *stream, queue_t *queue) {
                 queue->max_item_size, queue->buffer_size);
 
         /* data */
-        while (q_ptr != queue->tail) {
+        size_t sz = queue->cur_q_size;
+        while (sz != 0) {
                 if (q_ptr == (queue->buffer + queue->buffer_size)) {
                         q_ptr = queue->buffer;
                 }
@@ -142,6 +148,7 @@ void queue_print(FILE *stream, queue_t *queue) {
                 buf[(size_t)(*q_ptr)] = '\0';
                 fprintf(stream, "\t|--> %zu %s \n", (size_t)(*q_ptr), buf);
                 q_ptr += sizeof(size_t) + queue->max_item_size;
+                --sz;
         }
 
         fflush(stream);
