@@ -42,12 +42,6 @@ TST_OBJ ::= $(patsubst ${SRC_DIR}/${TST_SUBDIR}/%.c,${BIN_DIR}/${TST_SUBDIR}/%.o
 LNK_LIB ::= dotconf
 
 
-### functions
-
-
-CC ::= gcc
-
-
 ### targets
 all: lib app tst
 
