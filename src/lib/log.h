@@ -1,24 +1,29 @@
 #ifndef LOG_H
 #define LOG_H
 
-/* logger levels */
-#define TRACE 0
-#define DEBUG 1
-#define INFO  2
-#define WARN  3
-#define ERROR 4
-#define FATAL 5
+#include <syslog.h>
 
-/* current logger level */
-#define CUR_LOG_LVL DEBUG
+#define EMERG      LOG_EMERG
+#define ALERT      LOG_ALERT
+#define CRIT       LOG_CRIT
+#define ERR        LOG_ERR
+#define WARNING    LOG_WARNING
+#define NOTICE     LOG_NOTICE
+#define INFO       LOG_INFO
+#define DEBUG      LOG_DEBUG
 
-/* main logger function */
+/* logger operations are wrapped by macroses to be able painlessly change logger type in the future */
+
+#define OPEN_LOG() { \
+            openlog("cloudtiering", LOG_PID, LOG_DAEMON); \
+        }
+
 #define LOG(level,format,args...) { \
-            if (CUR_LOG_LVL <= level) { \
-                fprintf(stderr, format, ## args); \
-                fprintf(stderr, "\n"); \
-                fflush(stderr); \
-            } \
+            syslog(level, format, ## args); \
+        }
+        
+#define CLOSE_LOG() { \
+            closelog(); \
         }
 
 #endif // LOG_H
