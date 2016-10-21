@@ -5,7 +5,7 @@
 #include <syslog.h>
 #include <dotconf.h>
 
-#include "conf.h"
+#include "cloudtiering.h"
 
 int main(int argc, char *argv[]) {
         /* open connection to syslog */

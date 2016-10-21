@@ -4,7 +4,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "conf.h"
+#include "test-lib.h"
 
 static const char *test_conf_str = "FsMountPoint             /foo/bar\n"\
                                    "EvictSessionTimeout      100\n"\

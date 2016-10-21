@@ -3,7 +3,7 @@
 #include <string.h>
 #include <errno.h>
 
-#include "queue.h"
+#include "test-lib.h"
 
 static char *item[] = {
                 "Hello, World!",
@@ -137,7 +137,6 @@ int test_queue(char *err_msg) {
 
         queue_free(queue);
 
-succ:
         return 0;
 
 err:
