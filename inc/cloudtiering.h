@@ -1,8 +1,7 @@
 #ifndef CLOUDTIERING_H
 #define CLOUDTIERING_H
 
-int test_conf();
-int test_queue();
+/* add here library functions that should be exposed to outer world */
 
 #endif // CLOUDTIERING_H
 
