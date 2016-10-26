@@ -3,7 +3,7 @@
 #include <string.h>
 #include <errno.h>
 
-#include "test-lib.h"
+#include "cloudtiering.h"
 
 static char *item[] = {
                 "Hello, World!",

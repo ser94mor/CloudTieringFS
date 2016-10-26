@@ -7,7 +7,7 @@
 #include <time.h>
 #include <dotconf.h>
 
-#include "conf.h"
+#include "cloudtiering.h"
 
 static conf_t *conf = NULL;
 

@@ -11,7 +11,7 @@ VERSION   ::= ${MAJOR_VER}.${MINOR_VER}.${PATCH_VER}
 
 
 ### names
-APP_NAME   ::= fs-monitor
+APP_NAME   ::= cloudtiering-monitor
 LIB_SONAME ::= libcloudtiering.so
 LIB_NAME   ::= ${LIB_SONAME}.${VERSION}
 TST_NAME   ::= test-suit
@@ -57,7 +57,7 @@ tst: mkdir-${BIN_DIR}/${TST_SUBDIR} lib ${TST_OBJ}
 
 
 ${BIN_DIR}/${LIB_SUBDIR}/%.o: ${SRC_DIR}/${LIB_SUBDIR}/%.c
-	gcc -fPIC -g -c -Wall -std=c11 -o $@ $<
+	gcc -fPIC -g -c -Wall -std=c11 $(addprefix -I,${INC_DIR}) -o $@ $<
 
 ${BIN_DIR}/${APP_SUBDIR}/%.o: ${SRC_DIR}/${APP_SUBDIR}/%.c
 	gcc -g -Wall -std=c11 $(addprefix -I,${INC_DIR}) -c $< -o $@
