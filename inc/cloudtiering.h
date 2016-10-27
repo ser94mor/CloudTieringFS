@@ -16,6 +16,7 @@ typedef struct {
     double ev_start_rate;                 /* start evicting files when storage is (start_ev_rate * 100)% full */
     double ev_stop_rate;                  /* stop evicting files when storage is (stop_ev_rate * 100)% full */
     size_t ev_q_max_size;                 /* maximum size of evict queue */
+    char   logger[255];                   /* logging framework */
 } conf_t;
 
 int readconf(const char *conf_path);
@@ -33,19 +34,19 @@ conf_t *getconf();
 
 /* logger operations are wrapped by macroses to be able painlessly change logger type in the future */
 
-#define OPEN_LOG() { \
-            openlog("cloudtiering", LOG_PID, LOG_DAEMON); \
+#define OPEN_LOG(name) { \
+            openlog(name, LOG_PID, LOG_DAEMON); \
         }
 
 #define LOG(level,format,args...) { \
             syslog(level, format, ## args); \
         }
-        
+
 #define CLOSE_LOG() { \
             closelog(); \
         }
-        
-        
+
+
 /*
  * QUEUE
  */

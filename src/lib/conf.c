@@ -16,6 +16,7 @@ static DOTCONF_CB(ev_session_tm);
 static DOTCONF_CB(ev_start_rate);
 static DOTCONF_CB(ev_stop_rate);
 static DOTCONF_CB(ev_q_max_size);
+static DOTCONF_CB(logger);
 
 static const configoption_t options[] = {
         { "FsMountPoint",        ARG_STR,    fs_mount_point, NULL, CTX_ALL },
@@ -23,6 +24,7 @@ static const configoption_t options[] = {
         { "EvictStartRate",      ARG_DOUBLE, ev_start_rate,  NULL, CTX_ALL },
         { "EvictStopRate",       ARG_DOUBLE, ev_stop_rate,   NULL, CTX_ALL },
         { "EvictQueueMaxSize",   ARG_INT,    ev_q_max_size,  NULL, CTX_ALL },
+        { "LoggingFramework",    ARG_STR,    logger,         NULL, CTX_ALL },
         LAST_OPTION
 };
 
@@ -48,6 +50,11 @@ static DOTCONF_CB(ev_stop_rate) {
 
 static DOTCONF_CB(ev_q_max_size) {
         conf->ev_q_max_size = (size_t)cmd->data.value;
+        return NULL;
+}
+
+static DOTCONF_CB(logger) {
+        strcpy(conf->logger, cmd->data.str);
         return NULL;
 }
 
