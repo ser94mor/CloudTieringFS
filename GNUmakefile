@@ -49,7 +49,7 @@ lib: mkdir-${BIN_DIR}/${LIB_SUBDIR} ${LIB_OBJ}
 
 
 app: mkdir-${BIN_DIR}/${APP_SUBDIR} lib ${APP_OBJ}
-	gcc ${APP_OBJ} -o ${APP_NAME} -L${BIN_DIR} -l:${LIB_NAME}
+	gcc ${APP_OBJ} -o ${BIN_DIR}/${APP_NAME} -L${BIN_DIR} -l:${LIB_NAME}
 
 
 tst: mkdir-${BIN_DIR}/${TST_SUBDIR} lib ${TST_OBJ}
