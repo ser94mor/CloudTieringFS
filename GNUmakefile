@@ -46,7 +46,7 @@ all: lib app tst
 
 lib: mkdir-${BIN_DIR}/${LIB_SUBDIR} ${LIB_OBJ}
 	gcc -shared -Wl,-soname,${LIB_SONAME} ${LIB_OBJ} -o ${BIN_DIR}/${LIB_NAME} -ldotconf -ldl
-	ln --symbolic ${LIB_NAME} ${BIN_DIR}/${LIB_SONAME}
+	ln --symbolic --force ${LIB_NAME} ${BIN_DIR}/${LIB_SONAME}
 
 
 app: mkdir-${BIN_DIR}/${APP_SUBDIR} lib ${APP_OBJ}

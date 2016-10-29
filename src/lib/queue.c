@@ -8,7 +8,7 @@
 
 /**
  * @brief queue_empty Indicates that queue is empty.
- * @return >0 if size equals 0; 0 if size greater then 0; <0 if queue equals NULL
+ * @return >0 if size equals 0; 0 if size greater then 0; -1 if queue equals NULL
  */
 int queue_empty(queue_t *queue) {
         if (queue == NULL) {
@@ -20,7 +20,7 @@ int queue_empty(queue_t *queue) {
 
 /**
  * @brief queue_full Indicates that the queue is full.
- * @return >0 if size equals maximem queue size therwise 0; <0 if queue equals NULL
+ * @return >0 if size equals maximem queue size therwise 0; -1 if queue equals NULL
  */
 int queue_full(queue_t *queue) {
         if (queue == NULL) {
@@ -32,8 +32,7 @@ int queue_full(queue_t *queue) {
 
 /**
  * @brief queue_push Push item into queue if there is enough place for this item.
- * @note TODO: use mutex syncronization !!!
- * @return 0 on sussess; <0 on failure
+ * @return 0 on sussess; -1 on failure
  */
 int queue_push(queue_t *queue, char *item, size_t item_size) {
         if (queue == NULL || item == NULL || item_size == 0 ||
@@ -57,7 +56,7 @@ int queue_push(queue_t *queue, char *item, size_t item_size) {
 /**
  * @brief queue_pop Pop item from queue if queue is not empty.
  * @note TODO: use mutex syncronization !!!
- * @return 0 it item was popped; <0 if queue is NULL or queue is empty
+ * @return 0 it item was popped; -1 if queue is NULL or queue is empty
  */
 int queue_pop(queue_t *queue) {
         if (queue == NULL || queue->cur_q_size == 0) {

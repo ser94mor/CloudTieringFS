@@ -5,6 +5,8 @@
 #include <limits.h>
 #include <ctype.h>
 #include <time.h>
+#include <errno.h>
+#include <unistd.h>
 #include <dotconf.h>
 
 #include "cloudtiering.h"
@@ -67,27 +69,54 @@ inline conf_t *getconf() {
 }
 
 /**
+ * @brief init_dependent_members Initialize remaining members of configuration.
+ * @return 0 on success, -1 on failure
+ */
+static int init_dependent_members(void) {
+        /* pathconf will not change errno and will return -1 if requested resource does not have limit */
+        errno = 0; 
+        ssize_t path_max = pathconf(conf->fs_mount_point, _PC_PATH_MAX);
+        if ((path_max == -1) && !errno) {
+                path_max = PATH_MAX;
+        } else if (path_max == -1) {
+                return -1;
+        }
+        
+        conf->path_max = path_max;
+        
+        return 0;
+}
+
+/**
  * @brief readconf Read configuration from file.
  * @note Does not handle the case when line length exceeded LINE_MAX limit.
  * @note Does not handle the case when file contains duplicate keys.
  * @param[in] conf_path Path to a configuration file. If NULL then use default configuration.
- * @return 0 on success, non-0 on failure.
+ * @return 0 on success, -1 on failure.
  */
 int readconf(const char *conf_path) {
+        if (conf != NULL) {
+                return -1;
+        }
+        
         conf = (conf_t *)malloc(sizeof(conf_t));
 
         configfile_t *configfile;
 
         configfile = dotconf_create((char *)conf_path, options, NULL, NONE);
         if (!configfile) {
-                return 1;
+                return -1;
         }
 
         if (dotconf_command_loop(configfile) == 0) {
-                return 1;
+                return -1;
         }
 
         dotconf_cleanup(configfile);
+        
+        if (init_dependent_members()) {
+                return -1;
+        }
 
         return 0;
 }

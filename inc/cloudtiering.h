@@ -16,7 +16,8 @@ typedef struct {
     double ev_start_rate;                 /* start evicting files when storage is (start_ev_rate * 100)% full */
     double ev_stop_rate;                  /* stop evicting files when storage is (stop_ev_rate * 100)% full */
     size_t ev_q_max_size;                 /* maximum size of evict queue */
-    char   logger[255];                   /* logging framework */
+    char   logger[255];                   /* logging framework name (syslog) */
+    size_t path_max;                      /* maximum path length in fs_mount_point directory can not be lower than this value */
 } conf_t;
 
 int readconf(const char *conf_path);
