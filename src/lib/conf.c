@@ -2,11 +2,11 @@
 #include <stdio.h>
 #include <stddef.h>
 #include <string.h>
-#include <limits.h>
 #include <ctype.h>
 #include <time.h>
 #include <errno.h>
 #include <unistd.h>
+#include <linux/limits.h>
 #include <dotconf.h>
 
 #include "cloudtiering.h"
@@ -14,19 +14,19 @@
 static conf_t *conf = NULL;
 
 static DOTCONF_CB(fs_mount_point);
-static DOTCONF_CB(ev_session_tm);
+static DOTCONF_CB(scanfs_iter_tm_sec);
 static DOTCONF_CB(ev_start_rate);
 static DOTCONF_CB(ev_stop_rate);
 static DOTCONF_CB(ev_q_max_size);
 static DOTCONF_CB(logger);
 
 static const configoption_t options[] = {
-        { "FsMountPoint",        ARG_STR,    fs_mount_point, NULL, CTX_ALL },
-        { "EvictSessionTimeout", ARG_INT,    ev_session_tm,  NULL, CTX_ALL },
-        { "EvictStartRate",      ARG_DOUBLE, ev_start_rate,  NULL, CTX_ALL },
-        { "EvictStopRate",       ARG_DOUBLE, ev_stop_rate,   NULL, CTX_ALL },
-        { "EvictQueueMaxSize",   ARG_INT,    ev_q_max_size,  NULL, CTX_ALL },
-        { "LoggingFramework",    ARG_STR,    logger,         NULL, CTX_ALL },
+        { "FsMountPoint",         ARG_STR,    fs_mount_point, NULL, CTX_ALL },
+        { "ScanfsIterTimeoutSec", ARG_INT,    scanfs_iter_tm_sec,  NULL, CTX_ALL },
+        { "EvictStartRate",       ARG_DOUBLE, ev_start_rate,  NULL, CTX_ALL },
+        { "EvictStopRate",        ARG_DOUBLE, ev_stop_rate,   NULL, CTX_ALL },
+        { "EvictQueueMaxSize",    ARG_INT,    ev_q_max_size,  NULL, CTX_ALL },
+        { "LoggingFramework",     ARG_STR,    logger,         NULL, CTX_ALL },
         LAST_OPTION
 };
 
@@ -35,8 +35,8 @@ static DOTCONF_CB(fs_mount_point) {
         return NULL;
 }
 
-static DOTCONF_CB(ev_session_tm) {
-        conf->ev_session_tm = (time_t)cmd->data.value;
+static DOTCONF_CB(scanfs_iter_tm_sec) {
+        conf->scanfs_iter_tm_sec = (time_t)cmd->data.value;
         return NULL;
 }
 

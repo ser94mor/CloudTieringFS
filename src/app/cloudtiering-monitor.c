@@ -6,9 +6,16 @@
 
 #include "cloudtiering.h"
 
-queue_t *evict_queue = NULL;
+const queue_t *evict_queue = NULL;
 
-int init_data(void) {
+static int start_scanfs_thread(void) {
+        if (scanfs(evict_queue) == -1) {
+                return -1;
+        }
+        return 0;
+}
+
+static int init_data(void) {
         conf_t *conf = getconf();
         evict_queue = queue_alloc(conf->ev_q_max_size, conf->path_max);
 
@@ -33,6 +40,7 @@ int main(int argc, char *argv[]) {
                 return EXIT_FAILURE;
         }
         
+        start_scanfs_thread();
         
         //start_filessystem_info_updater_thread();
         //start_eviction_queue_updater_thread();

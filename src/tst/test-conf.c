@@ -7,7 +7,7 @@
 #include "cloudtiering.h"
 
 static const char *test_conf_str = "FsMountPoint             /foo/bar\n"\
-                                   "EvictSessionTimeout      100\n"\
+                                   "ScanfsIterTimeoutSec     100\n"\
                                    "EvictStartRate           0.8\n"\
                                    "EvictStopRate            0.7\n"\
                                    "EvictQueueMaxSize        9999\n";
@@ -53,7 +53,7 @@ int test_conf(char *err_msg) {
 
         conf = getconf();
         if (strcmp(conf->fs_mount_point, "/foo/bar") ||
-            conf->ev_session_tm != 100 ||
+            conf->scanfs_iter_tm_sec != 100 ||
             conf->ev_start_rate != 0.8 ||
             conf->ev_stop_rate != 0.7 ||
             conf->ev_q_max_size != 9999) {
