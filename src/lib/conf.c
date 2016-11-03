@@ -10,6 +10,7 @@
 #include <dotconf.h>
 
 #include "cloudtiering.h"
+#include "log.c"
 
 static conf_t *conf = NULL;
 
@@ -56,7 +57,15 @@ static DOTCONF_CB(ev_q_max_size) {
 }
 
 static DOTCONF_CB(logger) {
-        strcpy(conf->logger, cmd->data.str);
+        if (strcmp(cmd->data.str, "syslog") == 0) {
+                conf->logger.open_log = syslog_open_log;
+                conf->logger.log = syslog_log;
+                conf->logger.close_log = syslog_close_log;
+        } else {
+               conf->logger.open_log = default_open_log;
+               conf->logger.log = default_log;
+               conf->logger.close_log = default_close_log;
+        }
         return NULL;
 }
 
