@@ -10,27 +10,18 @@ typedef struct {
         void (*open_log)(const char *);
         void (*log)(int, const char *, ...);
         void (*close_log)(void);
+        int  error;
+        int  info;
+        int  debug;
 } log_t;
 
-#include <syslog.h>
+#define ERROR      (getconf()->logger.error)
+#define INFO       (getconf()->logger.info)
+#define DEBUG      (getconf()->logger.debug)
 
-#define ERROR      LOG_ERR
-#define INFO       LOG_INFO
-#define DEBUG      LOG_DEBUG
-
-/* logger operations are wrapped by macroses to be able painlessly change logger type in the future */
-
-#define OPEN_LOG(name) { \
-            openlog(name, LOG_PID, LOG_DAEMON); \
-        }
-
-#define LOG(level,format,args...) { \
-            syslog(level, format, ## args); \
-        }
-
-#define CLOSE_LOG() { \
-            closelog(); \
-        }
+#define OPEN_LOG(name)            (getconf()->logger.open_log(name))
+#define LOG(level,format,args...) (getconf()->logger.log(level, format, ## args))
+#define CLOSE_LOG()               (getconf()->logger.close_log())
 
 
 /*
@@ -91,5 +82,5 @@ void queue_print(FILE *stream, queue_t *q);
 
 int scanfs(const queue_t *queue);
 
-#endif // CLOUDTIERING_H
+#endif /* CLOUDTIERING_H */
 

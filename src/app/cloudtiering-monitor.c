@@ -23,25 +23,26 @@ static int init_data(void) {
 }
 
 int main(int argc, char *argv[]) {
-        OPEN_LOG(argv[0]);
-
         if (argc != 2) {
-                LOG(ERROR, "1 argument was expected but %d provided", argc - 1);
+                fprintf(stderr, "1 argument was expected but %d provided", argc - 1);
                 return EXIT_FAILURE;
         }
 
         if (readconf(argv[1])) {
-                LOG(ERROR, "failed to read configuration file %s", argv[1]);
+                fprintf(stderr, "failed to read configuration file %s", argv[1]);
                 return EXIT_FAILURE;
         }
+
+        /* here configuration has successfully been read and logger structure was initialized */
+        OPEN_LOG(argv[0]);
 
         if (init_data()) {
                 LOG(ERROR, "failed to init data structures required for work");
                 return EXIT_FAILURE;
         }
-        
+
         start_scanfs_thread();
-        
+
         //start_filessystem_info_updater_thread();
         //start_eviction_queue_updater_thread();
         //start_data_evictor_thread();

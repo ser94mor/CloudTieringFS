@@ -10,7 +10,7 @@
 #include <dotconf.h>
 
 #include "cloudtiering.h"
-#include "log.c"
+#include "log.h"
 
 static conf_t *conf = NULL;
 
@@ -58,13 +58,23 @@ static DOTCONF_CB(ev_q_max_size) {
 
 static DOTCONF_CB(logger) {
         if (strcmp(cmd->data.str, "syslog") == 0) {
-                conf->logger.open_log = syslog_open_log;
-                conf->logger.log = syslog_log;
+                /* syslog case */
+                conf->logger.open_log  = syslog_open_log;
+                conf->logger.log       = syslog_log;
                 conf->logger.close_log = syslog_close_log;
+
+                conf->logger.error = SYSLOG_ERROR;
+                conf->logger.info  = SYSLOG_INFO;
+                conf->logger.debug = SYSLOG_DEBUG;
         } else {
-               conf->logger.open_log = default_open_log;
-               conf->logger.log = default_log;
-               conf->logger.close_log = default_close_log;
+                /* default case */
+                conf->logger.open_log  = default_open_log;
+                conf->logger.log       = default_log;
+                conf->logger.close_log = default_close_log;
+
+                conf->logger.error = DEFAULT_ERROR;
+                conf->logger.info  = DEFAULT_INFO;
+                conf->logger.debug = DEFAULT_DEBUG;
         }
         return NULL;
 }
@@ -83,16 +93,16 @@ inline conf_t *getconf() {
  */
 static int init_dependent_members(void) {
         /* pathconf will not change errno and will return -1 if requested resource does not have limit */
-        errno = 0; 
+        errno = 0;
         ssize_t path_max = pathconf(conf->fs_mount_point, _PC_PATH_MAX);
         if ((path_max == -1) && !errno) {
                 path_max = PATH_MAX;
         } else if (path_max == -1) {
                 return -1;
         }
-        
+
         conf->path_max = path_max;
-        
+
         return 0;
 }
 
@@ -107,7 +117,7 @@ int readconf(const char *conf_path) {
         if (conf != NULL) {
                 return -1;
         }
-        
+
         conf = (conf_t *)malloc(sizeof(conf_t));
 
         configfile_t *configfile;
@@ -122,7 +132,7 @@ int readconf(const char *conf_path) {
         }
 
         dotconf_cleanup(configfile);
-        
+
         if (init_dependent_members()) {
                 return -1;
         }
