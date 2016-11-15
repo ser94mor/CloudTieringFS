@@ -59,6 +59,8 @@ static DOTCONF_CB(ev_q_max_size) {
 static DOTCONF_CB(logger) {
         if (strcmp(cmd->data.str, "syslog") == 0) {
                 /* syslog case */
+                strcpy(conf->logger.name, "syslog");
+                
                 conf->logger.open_log  = syslog_open_log;
                 conf->logger.log       = syslog_log;
                 conf->logger.close_log = syslog_close_log;
@@ -68,6 +70,8 @@ static DOTCONF_CB(logger) {
                 conf->logger.debug = SYSLOG_DEBUG;
         } else {
                 /* default case */
+                strcpy(conf->logger.name, "default");
+                
                 conf->logger.open_log  = default_open_log;
                 conf->logger.log       = default_log;
                 conf->logger.close_log = default_close_log;

@@ -7,12 +7,13 @@
  */
 
 typedef struct {
-        void (*open_log)(const char *);
-        void (*log)(int, const char *, ...);
-        void (*close_log)(void);
-        int  error;
-        int  info;
-        int  debug;
+        char name[256];                         /* human-readable name of logging framework */
+        void (*open_log)(const char *);         /* calls open log function from logger framework */
+        void (*log)(int, const char *, ...);    /* calls log function from logger framework */
+        void (*close_log)(void);                /* calls close log fucntion from logger framework */
+        int  error;                             /* integer representing ERROR level in logging framework */
+        int  info;                              /* integer representing INFO level in logging framework */
+        int  debug;                             /* integer representing DEBUG level in logging framework */
 } log_t;
 
 #define ERROR      (getconf()->logger.error)

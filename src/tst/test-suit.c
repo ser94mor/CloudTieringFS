@@ -2,13 +2,14 @@
 #include <stdlib.h>
 
 #include "cloudtiering.h"
-#include "test-suit.h"
+#include "test.h"
 
 static struct test_case {
         const char *name;
         int (*func)(char *);
 } test_suit[] = {
-        { "conf", test_conf },
+        { "conf",  test_conf },
+        { "log",   test_log },
         { "queue", test_queue }
 };
 

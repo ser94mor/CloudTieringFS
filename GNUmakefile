@@ -14,7 +14,7 @@ VERSION   ::= ${MAJOR_VER}.${MINOR_VER}.${PATCH_VER}
 APP_NAME   ::= cloudtiering-monitor
 LIB_SONAME ::= libcloudtiering.so
 LIB_NAME   ::= ${LIB_SONAME}.${VERSION}
-TST_NAME   ::= test-suit
+TST_NAME   ::= cloudtiering-test
 
 
 ### directories
@@ -41,7 +41,7 @@ TST_OBJ ::= $(call obj_func,TST)
 
 
 ### targets
-all: lib app tst
+all: lib app tst validate
 
 
 lib: mkdir-${BIN_DIR}/${LIB_SUBDIR} ${LIB_OBJ}
@@ -55,6 +55,12 @@ app: mkdir-${BIN_DIR}/${APP_SUBDIR} lib ${APP_OBJ}
 
 tst: mkdir-${BIN_DIR}/${TST_SUBDIR} lib ${TST_OBJ}
 	gcc ${TST_OBJ} -o ${BIN_DIR}/${TST_NAME} -L${BIN_DIR} -l:${LIB_NAME}
+
+
+validate:
+	@pushd ${BIN_DIR} 1>/dev/null && \
+	LD_LIBRARY_PATH=. ./${TST_NAME} && \
+	popd 1>/dev/null
 
 
 ${BIN_DIR}/${LIB_SUBDIR}/%.o: ${SRC_DIR}/${LIB_SUBDIR}/%.c
