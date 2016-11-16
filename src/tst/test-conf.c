@@ -45,19 +45,19 @@ static int create_test_conf_file() {
 int test_conf(char *err_msg) {
         if (create_test_conf_file() == -1) {
                 strcpy(err_msg, "unable to create configuration file ./validate/test.conf");
-                return 1;
+                return -1;
         }
 
         conf_t *conf = getconf(); /* should be NULL before readconf call */
         if (conf != NULL) {
                 strcpy(err_msg, "'getconf' should return NULL before 'readconf' was ever invoked");
-                return 1;
+                return -1;
         }
 
         /* validate readconf(...) result */
         if (readconf("./validate/test.conf")) {
                 strcpy(err_msg, "'readconf' function failed");
-                return 1;
+                return -1;
         }
 
         conf = getconf();
@@ -69,7 +69,7 @@ int test_conf(char *err_msg) {
             strncmp(conf->logger.name, "default", sizeof(conf->logger.name))
         ) {
                 strcpy(err_msg, "configuratition contains incorrect values");
-                return 1;
+                return -1;
         }
 
         return 0;

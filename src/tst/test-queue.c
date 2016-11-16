@@ -142,7 +142,7 @@ int test_queue(char *err_msg) {
 err:
         stream = fopen("./queue.err", "w");
         if (!stream) {
-                return 1;
+                return -1;
         }
 
         queue_print(stream, queue); /* print out queue on error case */
@@ -150,5 +150,5 @@ err:
 
         fclose(stream); /* does not really want to know if fclose fail here or not */
 
-        return 1;
+        return -1;
 }

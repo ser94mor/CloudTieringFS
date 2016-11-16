@@ -35,5 +35,9 @@ int main(int argc, char *argv[]) {
 
         printf("FINISH TEST SUIT (%d test cases)\n", tst_cases);
 
-        exit(EXIT_SUCCESS);
+        if (fail_cnt == 0)  {
+                return EXIT_SUCCESS;
+        }
+        /* else (there were failures) */
+        return EXIT_FAILURE; 
 }
