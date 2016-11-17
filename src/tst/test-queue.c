@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <errno.h>
 
 #include "cloudtiering.h"
 
@@ -17,6 +16,7 @@ static char *item[] = {
 #define QUEUE_MAX_SIZE    3
 #define ITEM_MAX_SIZE     20
 
+/* TODO: add tests where more than 1 thread uses the same queue */
 
 int test_queue(char *err_msg) {
         FILE *stream;

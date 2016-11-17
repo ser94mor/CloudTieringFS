@@ -137,13 +137,21 @@ char *queue_front(queue_t *queue, size_t *size) {
  * @return Pointer to initialized queue_t.
  */
 queue_t *queue_alloc(size_t max_q_size, size_t max_item_size) {
-        /* allocate memory for ev_q data structure */
+        /* allocate memory for queue_t data structure */
         queue_t *queue = (queue_t *)malloc(sizeof(queue_t));
+        if (queue == NULL) {
+                return NULL;
+        }
+        
+        /* initialize structure members */
+        queue->buffer = (char *)malloc(queue->buffer_size);
+        if (queue->buffer == NULL) {
+                return NULL;
+        }
         queue->max_q_size = max_q_size;
         queue->cur_q_size = 0;
         queue->max_item_size = max_item_size;
         queue->buffer_size = (sizeof(size_t) + max_item_size) * max_q_size;
-        queue->buffer = (char *)malloc(queue->buffer_size);
         queue->head = queue->buffer;
         queue->tail = queue->buffer;
         queue->mutex = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
