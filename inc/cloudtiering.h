@@ -51,6 +51,7 @@ conf_t *getconf();
  */
 
 #include <stdio.h>
+#include <pthread.h>
 #include <sys/types.h>
 
 typedef struct {
@@ -61,6 +62,7 @@ typedef struct {
     size_t max_item_size;
     char *buffer;
     size_t buffer_size;
+    pthread_mutex_t mutex;
 } queue_t;
 
 int queue_empty(queue_t *q);
@@ -74,7 +76,7 @@ char *queue_front(queue_t *q, size_t *size);
 queue_t *queue_alloc(size_t max_q_size, size_t max_item_size);
 void queue_free(queue_t *q);
 
-void queue_print(FILE *stream, queue_t *q);
+int queue_print(FILE *stream, queue_t *q);
 
 
 /*

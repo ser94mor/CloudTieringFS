@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <pthread.h>
 #include <sys/types.h>
 
 #include "cloudtiering.h"
@@ -14,7 +15,14 @@ int queue_empty(queue_t *queue) {
         if (queue == NULL) {
                 return -1;
         }
-        return (queue->cur_q_size == 0);
+        
+        pthread_mutex_lock(&queue->mutex);
+        
+        int ret = (queue->cur_q_size == 0);
+        
+        pthread_mutex_unlock(&queue->mutex);
+        
+        return ret;
 }
 
 
@@ -26,7 +34,14 @@ int queue_full(queue_t *queue) {
         if (queue == NULL) {
                 return -1;
         }
-        return (queue->cur_q_size == queue->max_q_size);
+        
+        pthread_mutex_lock(&queue->mutex);
+        
+        int ret = (queue->cur_q_size == queue->max_q_size);
+        
+        pthread_mutex_unlock(&queue->mutex);
+        
+        return ret;
 }
 
 
@@ -36,11 +51,17 @@ int queue_full(queue_t *queue) {
  */
 int queue_push(queue_t *queue, char *item, size_t item_size) {
         if (queue == NULL || item == NULL || item_size == 0 ||
-            item_size > queue->max_item_size ||
-            queue->cur_q_size == queue->max_q_size) {
+            item_size > queue->max_item_size) {
                 return -1;
         }
 
+        pthread_mutex_lock(&queue->mutex);
+        
+        if (queue->cur_q_size == queue->max_q_size) {
+                pthread_mutex_unlock(&queue->mutex);
+                return -1;
+        }
+        
         char *ptr = queue->tail == (queue->buffer + queue->buffer_size) ? queue->buffer : queue->tail;
 
         memcpy(ptr, (char *)&item_size, sizeof(size_t));
@@ -48,6 +69,8 @@ int queue_push(queue_t *queue, char *item, size_t item_size) {
 
         queue->tail = (char *)(ptr + sizeof(size_t) + queue->max_item_size);
         queue->cur_q_size++;
+        
+        pthread_mutex_unlock(&queue->mutex);
 
         return 0;
 }
@@ -55,11 +78,17 @@ int queue_push(queue_t *queue, char *item, size_t item_size) {
 
 /**
  * @brief queue_pop Pop item from queue if queue is not empty.
- * @note TODO: use mutex syncronization !!!
  * @return 0 it item was popped; -1 if queue is NULL or queue is empty
  */
 int queue_pop(queue_t *queue) {
-        if (queue == NULL || queue->cur_q_size == 0) {
+        if (queue == NULL) {
+                return -1;
+        }
+        
+        pthread_mutex_lock(&queue->mutex);
+        
+        if (queue->cur_q_size == 0) {
+                pthread_mutex_unlock(&queue->mutex);
                 return -1;
         }
 
@@ -67,22 +96,39 @@ int queue_pop(queue_t *queue) {
                           queue->buffer :
                           queue->head + queue->max_item_size + sizeof(size_t);
         queue->cur_q_size--;
+        
+        pthread_mutex_unlock(&queue->mutex);
 
         return 0;
 }
 
 /**
  * @brief queue_front Returns pointer to head queue element and updates size of element varaible.
- * @return Pointer to head queue elementi or NULL if there are no elements.
+ * @return Pointer to head queue element or NULL if there are no elements.
  */
 char *queue_front(queue_t *queue, size_t *size) {
+        if (queue == NULL || size == NULL) {
+                if (size != NULL) {
+                        *size = 0;
+                }
+                
+                return NULL;
+        }
+        
+        pthread_mutex_lock(&queue->mutex);
+        
         if (queue->cur_q_size == 0) {
+                pthread_mutex_unlock(&queue->mutex);
                 *size = 0;
                 return NULL;
         }
 
         *size = (size_t)(*queue->head);
-        return queue->head + sizeof(size_t);
+        char *ret = queue->head + sizeof(size_t);
+        
+        pthread_mutex_unlock(&queue->mutex);
+        
+        return ret;
 }
 
 
@@ -100,6 +146,7 @@ queue_t *queue_alloc(size_t max_q_size, size_t max_item_size) {
         queue->buffer = (char *)malloc(queue->buffer_size);
         queue->head = queue->buffer;
         queue->tail = queue->buffer;
+        queue->mutex = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
 
         return queue;
 }
@@ -120,8 +167,16 @@ void queue_free(queue_t *queue) {
 
 /**
  * @brief queue_print Prints/Writes string representation of queue to the given file stream.
+ * @note Use this function for debug only.
+ * @return 0 on success and -1 on failure.
  */
-void queue_print(FILE *stream, queue_t *queue) {
+int queue_print(FILE *stream, queue_t *queue) {
+        if (queue == NULL || stream == NULL) {
+                return -1;
+        }
+        
+        pthread_mutex_lock(&queue->mutex);
+        
         char *q_ptr = queue->head;
 
         char buf[queue->max_item_size + 1];
@@ -151,4 +206,8 @@ void queue_print(FILE *stream, queue_t *queue) {
         }
 
         fflush(stream);
+        
+        pthread_mutex_unlock(&queue->mutex);
+        
+        return 0;
 }
