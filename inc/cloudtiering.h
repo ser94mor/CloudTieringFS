@@ -35,9 +35,11 @@ typedef struct {
 typedef struct {
     char   fs_mount_point[4096];          /* filesystem's root directory */
     time_t scanfs_iter_tm_sec;            /* the lowest time interval between file system scan iterations */
-    double ev_start_rate;                 /* start evicting files when storage is (start_ev_rate * 100)% full */
-    double ev_stop_rate;                  /* stop evicting files when storage is (stop_ev_rate * 100)% full */
-    size_t ev_q_max_size;                 /* maximum size of evict queue */
+    int    scanfs_max_fails;              /* the maximum number of allowed failures of scanfs execution */
+    double move_out_start_rate;           /* start evicting files when storage is (moveout_start_rate * 100)% full */
+    double move_out_stop_rate;            /* stop evicting files when storage is (moveout_stop_rate * 100)% full */
+    size_t out_q_max_size;                /* maximum size of out queue */
+    size_t in_q_max_size;                 /* maximum size of in queue */
     size_t path_max;                      /* maximum path length in fs_mount_point directory can not be lower than this value */
     log_t  logger;                        /* implementation neutral logger */
 } conf_t;
@@ -76,14 +78,12 @@ char *queue_front(queue_t *q, size_t *size);
 queue_t *queue_alloc(size_t max_q_size, size_t max_item_size);
 void queue_free(queue_t *q);
 
-int queue_print(FILE *stream, queue_t *q);
-
 
 /*
  * SCANFS
  */
 
-int scanfs(const queue_t *queue);
+int scanfs(const queue_t *in_q, const queue_t *out_q);
 
 #endif /* CLOUDTIERING_H */
 

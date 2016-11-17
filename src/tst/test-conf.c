@@ -11,9 +11,11 @@
 
 static const char *test_conf_str = "FsMountPoint             /foo/bar\n"\
                                    "ScanfsIterTimeoutSec     100\n"\
-                                   "EvictStartRate           0.8\n"\
-                                   "EvictStopRate            0.7\n"\
-                                   "EvictQueueMaxSize        9999\n"\
+                                   "ScanfsMaximumFailures    1\n"\
+                                   "MoveOutStartRate         0.8\n"\
+                                   "MoveOutStopRate          0.7\n"\
+                                   "OutQueueMaxSize          9999\n"\
+                                   "InQueueMaxSize           1111\n"\
                                    "LoggingFramework         default\n";
 
 static int create_test_conf_file() {
@@ -63,9 +65,10 @@ int test_conf(char *err_msg) {
         conf = getconf();
         if (strcmp(conf->fs_mount_point, "/foo/bar") ||
             conf->scanfs_iter_tm_sec != 100 ||
-            conf->ev_start_rate != 0.8 ||
-            conf->ev_stop_rate != 0.7 ||
-            conf->ev_q_max_size != 9999 ||
+            conf->move_out_start_rate != 0.8 ||
+            conf->move_out_stop_rate != 0.7 ||
+            conf->out_q_max_size != 9999 ||
+            conf->in_q_max_size != 1111 ||
             strncmp(conf->logger.name, "default", sizeof(conf->logger.name))
         ) {
                 strcpy(err_msg, "configuratition contains incorrect values");
