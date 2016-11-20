@@ -39,5 +39,5 @@ int main(int argc, char *argv[]) {
                 return EXIT_SUCCESS;
         }
         /* else (there were failures) */
-        return EXIT_FAILURE; 
+        return EXIT_FAILURE;
 }

@@ -11,7 +11,7 @@ static void *scanfs_routine(void *args) {
         queue_t *in_queue  = in_out_q[0];
         queue_t *out_queue = in_out_q[1];
         conf_t *conf = getconf();
-        
+
         time_t beg_time;  /* start of scanfs execution */
         time_t end_time;  /* finish of scanfs execution */
         time_t diff_time; /* difference between beg_time and end_time */
@@ -19,7 +19,7 @@ static void *scanfs_routine(void *args) {
         for (;;) {
                 beg_time = time(NULL);
                 if (scanfs(in_queue, out_queue) == -1 && conf->scanfs_max_fails != -1) {
-                        
+
                         /* handle failure of scanfs in case conf->scanfs_max_fails has limit (!= -1) */
                         ++scanfs_fails;
                         if (scanfs_fails > conf->scanfs_max_fails) {
@@ -27,7 +27,7 @@ static void *scanfs_routine(void *args) {
                                 return NULL;
                         }
                         LOG(ERROR, "scanfs execution failed (%d/%d)", scanfs_fails, conf->scanfs_max_fails);
-                        
+
                 }
                 end_time = time(NULL);
                 diff_time = (time_t)difftime(end_time, beg_time);
@@ -45,7 +45,7 @@ int main(int argc, char *argv[]) {
         conf_t *conf = NULL;       /* pointer to program configuration */
         queue_t *in_queue = NULL;  /* pointer to queue that stores files to be moved to local store */
         queue_t *out_queue = NULL; /* pointer to queue that stores files to be moved to remote store */
-        
+
         if (argc != 2) {
                 fprintf(stderr, "1 argument was expected but %d provided", argc - 1);
                 return EXIT_FAILURE;
@@ -65,13 +65,13 @@ int main(int argc, char *argv[]) {
                 LOG(ERROR, "getconf() unexpectedly returned NULL; unable to start");
                 return EXIT_FAILURE;
         }
-        
+
         in_queue = queue_alloc(conf->in_q_max_size, conf->path_max);
         if (in_queue == NULL) {
                 LOG(ERROR, "unable to allocate memory for in_queue");
                 return EXIT_FAILURE;
         }
-        
+
         out_queue = queue_alloc(conf->out_q_max_size, conf->path_max);
         if (out_queue == NULL) {
                 LOG(ERROR, "unable to allocate memory for out_queue");
@@ -91,9 +91,9 @@ int main(int argc, char *argv[]) {
         //start_filessystem_info_updater_thread();
         //start_eviction_queue_updater_thread();
         //start_data_evictor_thread();
-        
+
         for(;;){}
-        
+
         /* if we reach this place then there was a failure in some thread */
         free(conf);
         queue_free(out_queue);

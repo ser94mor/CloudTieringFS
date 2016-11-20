@@ -15,13 +15,13 @@ int queue_empty(queue_t *queue) {
         if (queue == NULL) {
                 return -1;
         }
-        
+
         pthread_mutex_lock(&queue->mutex);
-        
+
         int ret = (queue->cur_q_size == 0);
-        
+
         pthread_mutex_unlock(&queue->mutex);
-        
+
         return ret;
 }
 
@@ -34,13 +34,13 @@ int queue_full(queue_t *queue) {
         if (queue == NULL) {
                 return -1;
         }
-        
+
         pthread_mutex_lock(&queue->mutex);
-        
+
         int ret = (queue->cur_q_size == queue->max_q_size);
-        
+
         pthread_mutex_unlock(&queue->mutex);
-        
+
         return ret;
 }
 
@@ -56,12 +56,12 @@ int queue_push(queue_t *queue, char *item, size_t item_size) {
         }
 
         pthread_mutex_lock(&queue->mutex);
-        
+
         if (queue->cur_q_size == queue->max_q_size) {
                 pthread_mutex_unlock(&queue->mutex);
                 return -1;
         }
-        
+
         char *ptr = queue->tail == (queue->buffer + queue->buffer_size) ? queue->buffer : queue->tail;
 
         memcpy(ptr, (char *)&item_size, sizeof(size_t));
@@ -69,7 +69,7 @@ int queue_push(queue_t *queue, char *item, size_t item_size) {
 
         queue->tail = (char *)(ptr + sizeof(size_t) + queue->max_item_size);
         queue->cur_q_size++;
-        
+
         pthread_mutex_unlock(&queue->mutex);
 
         return 0;
@@ -84,9 +84,9 @@ int queue_pop(queue_t *queue) {
         if (queue == NULL) {
                 return -1;
         }
-        
+
         pthread_mutex_lock(&queue->mutex);
-        
+
         if (queue->cur_q_size == 0) {
                 pthread_mutex_unlock(&queue->mutex);
                 return -1;
@@ -96,7 +96,7 @@ int queue_pop(queue_t *queue) {
                           queue->buffer :
                           queue->head + queue->max_item_size + sizeof(size_t);
         queue->cur_q_size--;
-        
+
         pthread_mutex_unlock(&queue->mutex);
 
         return 0;
@@ -111,12 +111,12 @@ char *queue_front(queue_t *queue, size_t *size) {
                 if (size != NULL) {
                         *size = 0;
                 }
-                
+
                 return NULL;
         }
-        
+
         pthread_mutex_lock(&queue->mutex);
-        
+
         if (queue->cur_q_size == 0) {
                 pthread_mutex_unlock(&queue->mutex);
                 *size = 0;
@@ -125,9 +125,9 @@ char *queue_front(queue_t *queue, size_t *size) {
 
         *size = (size_t)(*queue->head);
         char *ret = queue->head + sizeof(size_t);
-        
+
         pthread_mutex_unlock(&queue->mutex);
-        
+
         return ret;
 }
 
@@ -142,7 +142,7 @@ queue_t *queue_alloc(size_t max_q_size, size_t max_item_size) {
         if (queue == NULL) {
                 return NULL;
         }
-        
+
         /* initialize structure members */
         queue->buffer = (char *)malloc(queue->buffer_size);
         if (queue->buffer == NULL) {

@@ -10,7 +10,7 @@ static char *item[] = {
                 "Let's play a game.",
                 "Don't be so shy.",
                 "Good luck!",
-                "Hello? Hello? C-can you here me? I'm supposed to be too big, to exceed itém limít." 
+                "Hello? Hello? C-can you here me? I'm supposed to be too big, to exceed itém limít."
 };
 
 #define QUEUE_MAX_SIZE    3
@@ -20,9 +20,9 @@ static int queue_print(FILE *stream, queue_t *queue) {
         if (queue == NULL || stream == NULL) {
                 return -1;
         }
-        
+
         pthread_mutex_lock(&queue->mutex);
-        
+
         char *q_ptr = queue->head;
 
         char buf[queue->max_item_size + 1];
@@ -52,9 +52,9 @@ static int queue_print(FILE *stream, queue_t *queue) {
         }
 
         fflush(stream);
-        
+
         pthread_mutex_unlock(&queue->mutex);
-        
+
         return 0;
 }
 
@@ -77,7 +77,7 @@ int test_queue(char *err_msg) {
 
         int i = 0;
         for (i = 0; i < QUEUE_MAX_SIZE; i++) {
-                if(queue_push(queue, item[i], strlen(item[i]) + 1)) {                        
+                if(queue_push(queue, item[i], strlen(item[i]) + 1)) {
                         strcpy(err_msg, "'queue_push' failed; ordinary case");
                         goto err;
                 }

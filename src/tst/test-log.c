@@ -14,13 +14,13 @@ static void sigsegv_handler(int signo) {
 }
 
 int test_log(char *err_msg) {
-        /* this test should be execute after test_conf where 
+        /* this test should be execute after test_conf where
            conf_t and log_t structures will be initialized */
         if (getconf() == NULL) {
                 strcpy(err_msg, "configuration was not initialized (getconf() returned NULL)");
                 return -1;
         }
-        
+
         /* in our case logger framework should be 'default' which means no actions
            we simply invoke methonds to verify that log_t structure was initialized;
            on error we expect segfauld with high probability */
@@ -28,7 +28,7 @@ int test_log(char *err_msg) {
                 strcpy(err_msg, "failed to register custom signal handler for SIGSEGV");
                 return -1;
         }
-        
+
         int fault_code = setjmp(restore_point);
         if (fault_code != 0) {
                 signal(SIGSEGV, SIG_DFL); /* set SEGSEGV handler to default */
@@ -36,8 +36,8 @@ int test_log(char *err_msg) {
                                  "function pointers were not initialized; setjmp() returned: %d", fault_code);
                 return -1;
         }
-        
-        
+
+
         OPEN_LOG("test");
 
         LOG(DEBUG, "Hello, %s!", "World");
@@ -47,6 +47,6 @@ int test_log(char *err_msg) {
         CLOSE_LOG();
 
         signal(SIGSEGV, SIG_DFL); /* set SEGSEGV handler to default */
-        
+
         return 0;
 }

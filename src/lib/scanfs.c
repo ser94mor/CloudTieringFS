@@ -44,7 +44,7 @@ int scanfs(const queue_t *in_q, const queue_t *out_q) {
 
         in_queue  = in_q;
         out_queue = out_q;
-  
+
         /* set maximum number of open files for nftw to a half of descriptor table size for current process */
         struct rlimit rlim;
         if (getrlimit(RLIMIT_NOFILE, &rlim) == -1) {

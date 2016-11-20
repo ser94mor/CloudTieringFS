@@ -21,7 +21,7 @@ static const char *test_conf_str = "FsMountPoint             /foo/bar\n"\
 static int create_test_conf_file() {
         /* create configuration file */
         FILE *stream;
-        
+
         int ret = mkdir("./validate", S_IRWXU | S_IRWXG | S_IRWXO);
         if (ret == -1 && errno != EEXIST) {
                 return -1;
