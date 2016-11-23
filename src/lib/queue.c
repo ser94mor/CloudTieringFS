@@ -18,7 +18,8 @@ int queue_empty(queue_t *queue) {
 
         pthread_mutex_lock(&queue->mutex);
 
-        int ret = (queue->cur_q_size == 0);
+        /* ensure that positive non-zero value will be returned if queue is empty */
+        int ret = (queue->cur_q_size == 0) ? 1 : 0;
 
         pthread_mutex_unlock(&queue->mutex);
 
