@@ -1,9 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <errno.h>
 
-#include "test-lib.h"
+#include "cloudtiering.h"
 
 static char *item[] = {
                 "Hello, World!",
@@ -11,12 +10,55 @@ static char *item[] = {
                 "Let's play a game.",
                 "Don't be so shy.",
                 "Good luck!",
-                "Hello? Hello? C-can you here me? I'm supposed to be too big, to exceed itém limít." 
+                "Hello? Hello? C-can you here me? I'm supposed to be too big, to exceed itém limít."
 };
 
 #define QUEUE_MAX_SIZE    3
 #define ITEM_MAX_SIZE     20
 
+static int queue_print(FILE *stream, queue_t *queue) {
+        if (queue == NULL || stream == NULL) {
+                return -1;
+        }
+
+        pthread_mutex_lock(&queue->mutex);
+
+        char *q_ptr = queue->head;
+
+        char buf[queue->max_item_size + 1];
+
+        /* header */
+        fprintf(stream, "QUEUE:\n");
+
+        /* metadata */
+        fprintf(stream, "\t< cur. queue size : %zu >\n"\
+                        "\t< max. queue size : %zu >\n"\
+                        "\t< max. item  size : %zu >\n"\
+                        "\t< queue buf. size : %zu >\n",
+                queue->cur_q_size, queue->max_q_size,
+                queue->max_item_size, queue->buffer_size);
+
+        /* data */
+        size_t sz = queue->cur_q_size;
+        while (sz != 0) {
+                if (q_ptr == (queue->buffer + queue->buffer_size)) {
+                        q_ptr = queue->buffer;
+                }
+                memcpy(buf, q_ptr + sizeof(size_t), (size_t)(*q_ptr));
+                buf[(size_t)(*q_ptr)] = '\0';
+                fprintf(stream, "\t|--> %zu %s \n", (size_t)(*q_ptr), buf);
+                q_ptr += sizeof(size_t) + queue->max_item_size;
+                --sz;
+        }
+
+        fflush(stream);
+
+        pthread_mutex_unlock(&queue->mutex);
+
+        return 0;
+}
+
+/* TODO: add tests where more than 1 thread uses the same queue */
 
 int test_queue(char *err_msg) {
         FILE *stream;
@@ -35,7 +77,7 @@ int test_queue(char *err_msg) {
 
         int i = 0;
         for (i = 0; i < QUEUE_MAX_SIZE; i++) {
-                if(queue_push(queue, item[i], strlen(item[i]) + 1)) {                        
+                if(queue_push(queue, item[i], strlen(item[i]) + 1)) {
                         strcpy(err_msg, "'queue_push' failed; ordinary case");
                         goto err;
                 }
@@ -140,9 +182,9 @@ int test_queue(char *err_msg) {
         return 0;
 
 err:
-        stream = fopen("./queue.err", "w");
+        stream = fopen("./validate/test-queue.dump", "w");
         if (!stream) {
-                return 1;
+                return -1;
         }
 
         queue_print(stream, queue); /* print out queue on error case */
@@ -150,5 +192,5 @@ err:
 
         fclose(stream); /* does not really want to know if fclose fail here or not */
 
-        return 1;
+        return -1;
 }

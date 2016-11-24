@@ -1,24 +1,29 @@
 #ifndef LOG_H
 #define LOG_H
 
-/* logger levels */
-#define TRACE 0
-#define DEBUG 1
-#define INFO  2
-#define WARN  3
-#define ERROR 4
-#define FATAL 5
+/**
+ * SYSLOG
+ */
+#include <syslog.h>
 
-/* current logger level */
-#define CUR_LOG_LVL DEBUG
+#define SYSLOG_ERROR    LOG_ERR
+#define SYSLOG_INFO     LOG_INFO
+#define SYSLOG_DEBUG    LOG_DEBUG
 
-/* main logger function */
-#define LOG(level,format,args...) { \
-            if (CUR_LOG_LVL <= level) { \
-                fprintf(stderr, format, ## args); \
-                fprintf(stderr, "\n"); \
-                fflush(stderr); \
-            } \
-        }
+void syslog_open_log(const char *name);
+void syslog_log(int level, const char *msg_fmt, ...);
+void syslog_close_log(void);
 
-#endif // LOG_H
+
+/**
+ * DEFAULT
+ */
+#define     DEFAULT_ERROR    0
+#define     DEFAULT_INFO     3
+#define     DEFAULT_DEBUG    5
+
+void default_open_log(const char *name);
+void default_log(int level, const char *msg_fmt, ...);
+void default_close_log(void);
+
+#endif /* LOG_H */

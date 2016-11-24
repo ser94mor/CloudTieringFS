@@ -2,13 +2,14 @@
 #include <stdlib.h>
 
 #include "cloudtiering.h"
-#include "test-suit.h"
+#include "test.h"
 
 static struct test_case {
         const char *name;
         int (*func)(char *);
 } test_suit[] = {
-        { "conf", test_conf },
+        { "conf",  test_conf },
+        { "log",   test_log },
         { "queue", test_queue }
 };
 
@@ -34,5 +35,9 @@ int main(int argc, char *argv[]) {
 
         printf("FINISH TEST SUIT (%d test cases)\n", tst_cases);
 
-        exit(EXIT_SUCCESS);
+        if (fail_cnt == 0)  {
+                return EXIT_SUCCESS;
+        }
+        /* else (there were failures) */
+        return EXIT_FAILURE;
 }
