@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <ftw.h>
+#include <sys/stat.h>
 #include <sys/resource.h>
 
 #include "cloudtiering.h"
@@ -39,7 +40,7 @@ static int update_evict_queue(const char *fpath, const struct stat *sb,  int typ
         return 0;
 }
 
-int scanfs(const queue_t *in_q, const queue_t *out_q) {
+int scanfs(queue_t *in_q, queue_t *out_q) {
         conf_t *conf = getconf();
 
         in_queue  = in_q;

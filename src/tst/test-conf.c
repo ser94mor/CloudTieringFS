@@ -12,6 +12,7 @@
 static const char *test_conf_str = "FsMountPoint             /foo/bar\n"\
                                    "ScanfsIterTimeoutSec     100\n"\
                                    "ScanfsMaximumFailures    1\n"\
+                                   "MoveFileMaximumFailures  2\n"\
                                    "MoveOutStartRate         0.8\n"\
                                    "MoveOutStopRate          0.7\n"\
                                    "OutQueueMaxSize          9999\n"\
@@ -65,6 +66,8 @@ int test_conf(char *err_msg) {
         conf = getconf();
         if (strcmp(conf->fs_mount_point, "/foo/bar") ||
             conf->scanfs_iter_tm_sec != 100 ||
+            conf->scanfs_max_fails != 1 ||
+            conf->move_file_max_fails != 2 ||
             conf->move_out_start_rate != 0.8 ||
             conf->move_out_stop_rate != 0.7 ||
             conf->out_q_max_size != 9999 ||

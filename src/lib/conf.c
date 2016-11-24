@@ -17,6 +17,7 @@ static conf_t *conf = NULL;
 static DOTCONF_CB(fs_mount_point);
 static DOTCONF_CB(scanfs_iter_tm_sec);
 static DOTCONF_CB(scanfs_max_fails);
+static DOTCONF_CB(move_file_max_fails);
 static DOTCONF_CB(move_out_start_rate);
 static DOTCONF_CB(move_out_stop_rate);
 static DOTCONF_CB(out_q_max_size);
@@ -24,14 +25,15 @@ static DOTCONF_CB(in_q_max_size);
 static DOTCONF_CB(logger);
 
 static const configoption_t options[] = {
-        { "FsMountPoint",          ARG_STR,    fs_mount_point,      NULL, CTX_ALL },
-        { "ScanfsIterTimeoutSec",  ARG_INT,    scanfs_iter_tm_sec,  NULL, CTX_ALL },
-        { "ScanfsMaximumFailures", ARG_INT,    scanfs_max_fails,    NULL, CTX_ALL },
-        { "MoveOutStartRate",      ARG_DOUBLE, move_out_start_rate, NULL, CTX_ALL },
-        { "MoveOutStopRate",       ARG_DOUBLE, move_out_stop_rate,  NULL, CTX_ALL },
-        { "OutQueueMaxSize",       ARG_INT,    out_q_max_size,      NULL, CTX_ALL },
-        { "InQueueMaxSize",        ARG_INT,    in_q_max_size,       NULL, CTX_ALL },
-        { "LoggingFramework",      ARG_STR,    logger,              NULL, CTX_ALL },
+        { "FsMountPoint",            ARG_STR,    fs_mount_point,      NULL, CTX_ALL },
+        { "ScanfsIterTimeoutSec",    ARG_INT,    scanfs_iter_tm_sec,  NULL, CTX_ALL },
+        { "ScanfsMaximumFailures",   ARG_INT,    scanfs_max_fails,    NULL, CTX_ALL },
+        { "MoveFileMaximumFailures", ARG_INT,    move_file_max_fails, NULL, CTX_ALL },
+        { "MoveOutStartRate",        ARG_DOUBLE, move_out_start_rate, NULL, CTX_ALL },
+        { "MoveOutStopRate",         ARG_DOUBLE, move_out_stop_rate,  NULL, CTX_ALL },
+        { "OutQueueMaxSize",         ARG_INT,    out_q_max_size,      NULL, CTX_ALL },
+        { "InQueueMaxSize",          ARG_INT,    in_q_max_size,       NULL, CTX_ALL },
+        { "LoggingFramework",        ARG_STR,    logger,              NULL, CTX_ALL },
         LAST_OPTION
 };
 
@@ -47,6 +49,11 @@ static DOTCONF_CB(scanfs_iter_tm_sec) {
 
 static DOTCONF_CB(scanfs_max_fails) {
         conf->scanfs_max_fails = (int)cmd->data.value;
+        return NULL;
+}
+
+static DOTCONF_CB(move_file_max_fails) {
+        conf->move_file_max_fails = (int)cmd->data.value;
         return NULL;
 }
 
@@ -74,7 +81,7 @@ static DOTCONF_CB(logger) {
         if (strcmp(cmd->data.str, "syslog") == 0) {
                 /* syslog case */
                 strcpy(conf->logger.name, "syslog");
-                
+
                 conf->logger.open_log  = syslog_open_log;
                 conf->logger.log       = syslog_log;
                 conf->logger.close_log = syslog_close_log;
@@ -85,7 +92,7 @@ static DOTCONF_CB(logger) {
         } else {
                 /* default case */
                 strcpy(conf->logger.name, "default");
-                
+
                 conf->logger.open_log  = default_open_log;
                 conf->logger.log       = default_log;
                 conf->logger.close_log = default_close_log;
