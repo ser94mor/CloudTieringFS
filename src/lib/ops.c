@@ -24,6 +24,14 @@ static int is_valid_path(const char *path) {
         return 1; /* true */
 }
 
+int set_xattr(const char *key, const char *value) {
+
+}
+
+void *get_xattr(const char *key) {
+
+}
+
 /**
  * @brief move_file Move file on the front of the queue in or out (obvious from the file attributes).
  * @return -1 on failure; 0 on success
