@@ -28,7 +28,7 @@ int set_xattr(const char *key, const char *value) {
 
 }
 
-void *get_xattr(const char *key) {
+const char *get_xattr(const char *key) {
 
 }
 
