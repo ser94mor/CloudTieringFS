@@ -23,17 +23,25 @@ static DOTCONF_CB(move_out_stop_rate);
 static DOTCONF_CB(out_q_max_size);
 static DOTCONF_CB(in_q_max_size);
 static DOTCONF_CB(logger);
+static DOTCONF_CB(s3_default_hostname);
+static DOTCONF_CB(s3_bucket);
+static DOTCONF_CB(s3_access_key_id);
+static DOTCONF_CB(s3_secret_access_key);
 
 static const configoption_t options[] = {
-        { "FsMountPoint",            ARG_STR,    fs_mount_point,      NULL, CTX_ALL },
-        { "ScanfsIterTimeoutSec",    ARG_INT,    scanfs_iter_tm_sec,  NULL, CTX_ALL },
-        { "ScanfsMaximumFailures",   ARG_INT,    scanfs_max_fails,    NULL, CTX_ALL },
-        { "MoveFileMaximumFailures", ARG_INT,    move_file_max_fails, NULL, CTX_ALL },
-        { "MoveOutStartRate",        ARG_DOUBLE, move_out_start_rate, NULL, CTX_ALL },
-        { "MoveOutStopRate",         ARG_DOUBLE, move_out_stop_rate,  NULL, CTX_ALL },
-        { "OutQueueMaxSize",         ARG_INT,    out_q_max_size,      NULL, CTX_ALL },
-        { "InQueueMaxSize",          ARG_INT,    in_q_max_size,       NULL, CTX_ALL },
-        { "LoggingFramework",        ARG_STR,    logger,              NULL, CTX_ALL },
+        { "FsMountPoint",            ARG_STR,    fs_mount_point,       NULL, CTX_ALL },
+        { "ScanfsIterTimeoutSec",    ARG_INT,    scanfs_iter_tm_sec,   NULL, CTX_ALL },
+        { "ScanfsMaximumFailures",   ARG_INT,    scanfs_max_fails,     NULL, CTX_ALL },
+        { "MoveFileMaximumFailures", ARG_INT,    move_file_max_fails,  NULL, CTX_ALL },
+        { "MoveOutStartRate",        ARG_DOUBLE, move_out_start_rate,  NULL, CTX_ALL },
+        { "MoveOutStopRate",         ARG_DOUBLE, move_out_stop_rate,   NULL, CTX_ALL },
+        { "OutQueueMaxSize",         ARG_INT,    out_q_max_size,       NULL, CTX_ALL },
+        { "InQueueMaxSize",          ARG_INT,    in_q_max_size,        NULL, CTX_ALL },
+        { "LoggingFramework",        ARG_STR,    logger,               NULL, CTX_ALL },
+        { "S3DefaultHostname",       ARG_STR,    s3_default_hostname,  NULL, CTX_ALL },
+        { "S3Bucket",                ARG_STR,    s3_bucket,            NULL, CTX_ALL },
+        { "S3AccessKeyId",           ARG_STR,    s3_access_key_id,     NULL, CTX_ALL },
+        { "S3SecretAccessKey",       ARG_STR,    s3_secret_access_key, NULL, CTX_ALL },
         LAST_OPTION
 };
 
@@ -101,6 +109,26 @@ static DOTCONF_CB(logger) {
                 conf->logger.info  = DEFAULT_INFO;
                 conf->logger.debug = DEFAULT_DEBUG;
         }
+        return NULL;
+}
+
+static DOTCONF_CB(s3_default_hostname) {
+        strcpy(conf->s3_default_hostname, cmd->data.str);
+        return NULL;
+}
+
+static DOTCONF_CB(s3_bucket) {
+        strcpy(conf->s3_bucket, cmd->data.str);
+        return NULL;
+}
+
+static DOTCONF_CB(s3_access_key_id) {
+        strcpy(conf->s3_access_key_id, cmd->data.str);
+        return NULL;
+}
+
+static DOTCONF_CB(s3_secret_access_key) {
+        strcpy(conf->s3_secret_access_key, cmd->data.str);
         return NULL;
 }
 

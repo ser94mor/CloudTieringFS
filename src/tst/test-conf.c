@@ -17,7 +17,11 @@ static const char *test_conf_str = "FsMountPoint             /foo/bar\n"\
                                    "MoveOutStopRate          0.7\n"\
                                    "OutQueueMaxSize          9999\n"\
                                    "InQueueMaxSize           1111\n"\
-                                   "LoggingFramework         default\n";
+                                   "LoggingFramework         default\n"\
+                                   "S3DefaultHostname        s3_hostname\n"\
+                                   "S3Bucket                 s3.bucket\n"\
+                                   "S3AccessKeyId            test_access_key_id\n"\
+                                   "S3SecretAccessKey        test_secret_key\n";
 
 static int create_test_conf_file() {
         /* create configuration file */
@@ -65,6 +69,10 @@ int test_conf(char *err_msg) {
 
         conf = getconf();
         if (strcmp(conf->fs_mount_point, "/foo/bar") ||
+            strcmp(conf->s3_default_hostname, "s3_hostname") ||
+            strcmp(conf->s3_bucket, "s3.bucket") ||
+            strcmp(conf->s3_access_key_id, "test_access_key_id") ||
+            strcmp(conf->s3_secret_access_key, "test_secret_key") ||
             conf->scanfs_iter_tm_sec != 100 ||
             conf->scanfs_max_fails != 1 ||
             conf->move_file_max_fails != 2 ||

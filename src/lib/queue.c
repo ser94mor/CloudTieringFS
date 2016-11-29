@@ -139,13 +139,13 @@ char *queue_front(queue_t *queue, size_t *size) {
  */
 queue_t *queue_alloc(size_t max_q_size, size_t max_item_size) {
         /* allocate memory for queue_t data structure */
-        queue_t *queue = (queue_t *)malloc(sizeof(queue_t));
+        queue_t *queue = malloc(sizeof(queue_t));
         if (queue == NULL) {
                 return NULL;
         }
 
         /* initialize structure members */
-        queue->buffer = (char *)malloc(queue->buffer_size);
+        queue->buffer = malloc(queue->buffer_size);
         if (queue->buffer == NULL) {
                 return NULL;
         }

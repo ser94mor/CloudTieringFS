@@ -45,7 +45,7 @@ all: lib app tst validate
 
 
 lib: mkdir-${BIN_DIR}/${LIB_SUBDIR} ${LIB_OBJ}
-	gcc -pthread -shared -Wl,-soname,${LIB_SONAME} ${LIB_OBJ} -o ${BIN_DIR}/${LIB_NAME} -ldotconf -ldl
+	gcc -pthread -shared -Wl,-soname,${LIB_SONAME} ${LIB_OBJ} -o ${BIN_DIR}/${LIB_NAME} -ldotconf -ls3 -ldl
 	ln --symbolic --force ${LIB_NAME} ${BIN_DIR}/${LIB_SONAME}
 
 
