@@ -1,7 +1,22 @@
 #include <string.h>
+#include <errno.h>
+#include <sys/types.h>
+#include <attr/xattr.h>
 #include <sys/stat.h>
+#include <libs3.h>
 
 #include "cloudtiering.h"
+
+#define XATTR_NAMESPACE    "trusted"
+#define XATTR_OBJECT_ID    "object_id"
+
+struct {
+        const char *key;
+        size_t      size;
+} XATTR_SIZE[] = {
+        { XATTR_NAMESPACE "." XATTR_OBJECT_ID, S3_MAX_KEY_SIZE }
+};
+
 
 static int is_file_local(const char *path) {
         return -1;
@@ -24,12 +39,26 @@ static int is_valid_path(const char *path) {
         return 1; /* true */
 }
 
-int set_xattr(const char *key, const char *value) {
+int set_xattr(const char *path, const char *key, const char *value) {
+        /* create extended attribute or replace existing */
+        int ret = setxattr(path, key, value, strlen(value) + 1, 0);
+        if (ret == -1) {
+                LOG(ERROR, "failed to set extended attribute [key: %s; value: %s]; reason: %s",
+                    key, value, strerror(errno));
+                return -1;
+        }
 
+        return 0;
 }
 
-const char *get_xattr(const char *key) {
+const char *get_xattr(const char *path, const char *key) {
 
+        int ret = getxattr(path, key, )
+        return NULL;
+}
+
+int has_xattr(const char *path, const char *key) {
+        return 0;
 }
 
 /**
