@@ -31,7 +31,6 @@ typedef struct {
 
 #include <stddef.h>
 #include <time.h>
-#include <linux/limits.h>
 
 typedef struct {
         /* 4096 is minimum acceptable value (including null) according to POSIX (equals PATH_MAX from linux/limits.h) */
