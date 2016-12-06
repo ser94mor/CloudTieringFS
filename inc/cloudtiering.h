@@ -92,6 +92,9 @@ typedef struct {
         log_t  logger;                        /* implementation neutral logger */
         ops_t  ops;                           /* operation (depends on remote store protocol) */
 
+        /* 63 it is unlikely that protocol identifies require more symbols */
+        char   remote_store_protocol[64];
+
         /* 255 equals to S3_MAX_HOSTNAME_SIZE from libs3 */
         char   s3_default_hostname[256];      /* s3 default hostname (libs3) */
 

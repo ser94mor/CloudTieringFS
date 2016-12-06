@@ -9,19 +9,26 @@
 
 #include "cloudtiering.h"
 
-static const char *test_conf_str = "FsMountPoint             /foo/bar\n"\
-                                   "ScanfsIterTimeoutSec     100\n"\
-                                   "ScanfsMaximumFailures    1\n"\
-                                   "MoveFileMaximumFailures  2\n"\
-                                   "MoveOutStartRate         0.8\n"\
-                                   "MoveOutStopRate          0.7\n"\
-                                   "OutQueueMaxSize          9999\n"\
-                                   "InQueueMaxSize           1111\n"\
-                                   "LoggingFramework         default\n"\
-                                   "S3DefaultHostname        s3_hostname\n"\
-                                   "S3Bucket                 s3.bucket\n"\
-                                   "S3AccessKeyId            test_access_key_id\n"\
-                                   "S3SecretAccessKey        test_secret_key\n";
+static const char *test_conf_str = "<General>\n"                             \
+                                   "    FsMountPoint             /foo/bar\n" \
+                                   "    LoggingFramework         default\n"  \
+                                   "    RemoteStoreProtocol      s3\n"       \
+                                   "</General>\n"                            \
+                                   "<Internal>\n"                            \
+                                   "    ScanfsIterTimeoutSec     100\n"      \
+                                   "    ScanfsMaximumFailures    1\n"        \
+                                   "    MoveFileMaximumFailures  2\n"        \
+                                   "    MoveOutStartRate         0.8\n"      \
+                                   "    MoveOutStopRate          0.7\n"      \
+                                   "    OutQueueMaxSize          9999\n"     \
+                                   "    InQueueMaxSize           1111\n"     \
+                                   "</Internal>\n"                           \
+                                   "<S3RemoteStore>\n"                       \
+                                   "    S3DefaultHostname        s3_hostname\n"        \
+                                   "    S3Bucket                 s3.bucket\n"          \
+                                   "    S3AccessKeyId            test_access_key_id\n" \
+                                   "    S3SecretAccessKey        test_secret_key\n"    \
+                                   "</S3RemoteStore>\n";
 
 static int create_test_conf_file() {
         /* create configuration file */
@@ -73,6 +80,7 @@ int test_conf(char *err_msg) {
             strcmp(conf->s3_bucket, "s3.bucket") ||
             strcmp(conf->s3_access_key_id, "test_access_key_id") ||
             strcmp(conf->s3_secret_access_key, "test_secret_key") ||
+            strcmp(conf->remote_store_protocol, "s3") ||
             conf->scanfs_iter_tm_sec != 100 ||
             conf->scanfs_max_fails != 1 ||
             conf->move_file_max_fails != 2 ||

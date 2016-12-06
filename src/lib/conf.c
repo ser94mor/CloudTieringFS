@@ -197,20 +197,25 @@ static DOTCONF_CB(in_q_max_size) {
 }
 
 static DOTCONF_CB(logger) {
-        if (strcmp(cmd->data.str + 1, logger_str[_syslog]) == 0) {
+        /* use '+ 1' to get rid of '_' prefix */
+        if (strcmp(cmd->data.str, logger_str[_syslog] + 1) == 0) {
                 conf->logger = _syslog_logger;
-        } else if (strcmp(cmd->data.str + 1, logger_str[_default]) == 0) {
+        } else if (strcmp(cmd->data.str, logger_str[_default] + 1) == 0) {
                 conf->logger = _default_logger;
         } else {
                 return "unsupported logger framework";
         }
 
+        /* get rid of '_' prefix in logger.name */
+        strcpy(conf->logger.name, conf->logger.name + 1);
+
         return NULL;
 }
 
 static DOTCONF_CB(remote_store_protocol) {
-        if (strcmp(cmd->data.str, protocol_str[s3])) {
+        if (strcmp(cmd->data.str, protocol_str[s3]) == 0) {
                 conf->ops = s3_ops;
+                strcpy(conf->remote_store_protocol, cmd->data.str);
         } else {
                 return "unsupported remote store protocol";
         }
@@ -277,7 +282,10 @@ int readconf(const char *conf_path) {
                 return -1;
         }
 
-        conf = (conf_t *)malloc(sizeof(conf_t));
+        conf = malloc(sizeof(conf_t));
+        if (conf == NULL) {
+                return -1;
+        }
 
         configfile_t *configfile;
 
