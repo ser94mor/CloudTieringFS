@@ -12,20 +12,20 @@
  */
 
 /**
- * @brief syslog_open_log Implementation of open_log function using syslog.
+ * @brief _syslog_open_log Implementation of open_log function using syslog.
  * @param name Name prepended to every message (usually program name).
  */
-void syslog_open_log(const char *name) {
+void _syslog_open_log(const char *name) {
         openlog(name, LOG_PID, LOG_DAEMON);
 }
 
 /**
- * @brief syslog_log Implementation of log function using syslog.
+ * @brief _syslog_log Implementation of log function using syslog.
  * @param level Logging level.
  * @param msg_fmt Message format.
  * @param ... Values to be substituted to the provided message format.
  */
-void syslog_log(int level, const char *msg_fmt, ...) {
+void _syslog_log(int level, const char *msg_fmt, ...) {
         va_list args;
         va_start(args, msg_fmt);
 
@@ -35,9 +35,9 @@ void syslog_log(int level, const char *msg_fmt, ...) {
 }
 
 /**
- * @brief syslog_close_log Implementation of close_log function using syslog.
+ * @brief _syslog_close_log Implementation of close_log function using syslog.
  */
-void syslog_close_log(void) {
+void _syslog_close_log(void) {
         closelog();
 }
 
@@ -50,7 +50,7 @@ void syslog_close_log(void) {
  * @brief default_open_log Default implementation of open_log function. Does nothing.
  * @param name Not used.
  */
-void default_open_log(const char *name) {
+void _default_open_log(const char *name) {
         /* no action */
 }
 
@@ -60,13 +60,13 @@ void default_open_log(const char *name) {
  * @param msg_fmt Not used.
  * @param ... Not used.
  */
-void default_log(int level, const char *msg_fmt, ...) {
+void _default_log(int level, const char *msg_fmt, ...) {
         /* no action */
 }
 
 /**
  * @brief default_close_log Default implementation of close_log function. Does nothing.
  */
-void default_close_log(void) {
+void _default_close_log(void) {
         /* no action */
 }

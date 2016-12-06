@@ -6,24 +6,24 @@
  */
 #include <syslog.h>
 
-#define SYSLOG_ERROR    LOG_ERR
-#define SYSLOG_INFO     LOG_INFO
-#define SYSLOG_DEBUG    LOG_DEBUG
+#define _syslog_ERROR    LOG_ERR
+#define _syslog_INFO     LOG_INFO
+#define _syslog_DEBUG    LOG_DEBUG
 
-void syslog_open_log(const char *name);
-void syslog_log(int level, const char *msg_fmt, ...);
-void syslog_close_log(void);
+void _syslog_open_log(const char *name);
+void _syslog_log(int level, const char *msg_fmt, ...);
+void _syslog_close_log(void);
 
 
 /**
  * DEFAULT
  */
-#define     DEFAULT_ERROR    0
-#define     DEFAULT_INFO     3
-#define     DEFAULT_DEBUG    5
+#define     _default_ERROR    0
+#define     _default_INFO     3
+#define     _default_DEBUG    5
 
-void default_open_log(const char *name);
-void default_log(int level, const char *msg_fmt, ...);
-void default_close_log(void);
+void _default_open_log(const char *name);
+void _default_log(int level, const char *msg_fmt, ...);
+void _default_close_log(void);
 
 #endif /* LOG_H */

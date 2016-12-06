@@ -1,0 +1,7 @@
+#!/bin/bash
+
+set -e
+
+/usr/bin/docker pull andrewgaul/s3proxy
+/usr/bin/docker run --publish 80:80 --env S3PROXY_AUTHORIZATION=none --detach --name s3proxy andrewgaul/s3proxy
+

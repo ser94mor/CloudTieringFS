@@ -26,44 +26,6 @@ typedef struct {
 
 
 /*
- * CONF
- */
-
-#include <stddef.h>
-#include <time.h>
-
-typedef struct {
-        /* 4096 is minimum acceptable value (including null) according to POSIX (equals PATH_MAX from linux/limits.h) */
-        char   fs_mount_point[4096];          /* filesystem's root directory */
-
-        time_t scanfs_iter_tm_sec;            /* the lowest time interval between file system scan iterations */
-        int    scanfs_max_fails;              /* the maximum number of allowed failures of scanfs execution */
-        int    move_file_max_fails;           /* the maximum number of allowed failures of file_move execution */
-        double move_out_start_rate;           /* start evicting files when storage is (move_out_start_rate * 100)% full */
-        double move_out_stop_rate;            /* stop evicting files when storage is (move_out_stop_rate * 100)% full */
-        size_t out_q_max_size;                /* maximum size of out queue */
-        size_t in_q_max_size;                 /* maximum size of in queue */
-        size_t path_max;                      /* maximum path length in fs_mount_point directory can not be lower than this value */
-        log_t  logger;                        /* implementation neutral logger */
-
-        /* 255 equals to S3_MAX_HOSTNAME_SIZE from libs3 */
-        char   s3_default_hostname[256];      /* s3 default hostname (libs3) */
-
-        /* 63 is maximum allowed bucket name according to http://docs.aws.amazon.com/AmazonS3/latest/dev/BucketRestrictions.html */
-        char   s3_bucket[64];                 /* name of s3 bucket which will be used as a remote tier */
-
-        /* 32 is maximum access key id length according to http://docs.aws.amazon.com/IAM/latest/APIReference/API_AccessKey.html */
-        char   s3_access_key_id[33];          /* s3 access key id */
-
-        /* 127 is an assumption that in practice longer keys do not exist */
-        char   s3_secret_access_key[128];     /* s3 secret access key */
-} conf_t;
-
-int readconf(const char *conf_path);
-conf_t *getconf();
-
-
-/*
  * QUEUE
  */
 
@@ -95,17 +57,63 @@ void queue_free(queue_t *q);
 
 
 /*
+ * OPS
+ */
+
+typedef struct {
+        int  (*init_remote_store_access)(void);
+        int  (*move_file_in)(const char *path);
+        int  (*move_file_out)(const char *path);
+        void (*term_remote_store_access)(void);
+} ops_t;
+
+int move_file(queue_t *queue);
+
+
+/*
+ * CONF
+ */
+
+#include <stddef.h>
+#include <time.h>
+
+typedef struct {
+        /* 4096 is minimum acceptable value (including null) according to POSIX (equals PATH_MAX from linux/limits.h) */
+        char   fs_mount_point[4096];          /* filesystem's root directory */
+
+        time_t scanfs_iter_tm_sec;            /* the lowest time interval between file system scan iterations */
+        int    scanfs_max_fails;              /* the maximum number of allowed failures of scanfs execution */
+        int    move_file_max_fails;           /* the maximum number of allowed failures of file_move execution */
+        double move_out_start_rate;           /* start evicting files when storage is (move_out_start_rate * 100)% full */
+        double move_out_stop_rate;            /* stop evicting files when storage is (move_out_stop_rate * 100)% full */
+        size_t out_q_max_size;                /* maximum size of out queue */
+        size_t in_q_max_size;                 /* maximum size of in queue */
+        size_t path_max;                      /* maximum path length in fs_mount_point directory can not be lower than this value */
+        log_t  logger;                        /* implementation neutral logger */
+        ops_t  ops;                           /* operation (depends on remote store protocol) */
+
+        /* 255 equals to S3_MAX_HOSTNAME_SIZE from libs3 */
+        char   s3_default_hostname[256];      /* s3 default hostname (libs3) */
+
+        /* 63 is maximum allowed bucket name according to http://docs.aws.amazon.com/AmazonS3/latest/dev/BucketRestrictions.html */
+        char   s3_bucket[64];                 /* name of s3 bucket which will be used as a remote tier */
+
+        /* 32 is maximum access key id length according to http://docs.aws.amazon.com/IAM/latest/APIReference/API_AccessKey.html */
+        char   s3_access_key_id[33];          /* s3 access key id */
+
+        /* 127 is an assumption that in practice longer keys do not exist */
+        char   s3_secret_access_key[128];     /* s3 secret access key */
+} conf_t;
+
+int readconf(const char *conf_path);
+conf_t *getconf();
+
+
+/*
  * SCANFS
  */
 
 int scanfs(queue_t *in_q, queue_t *out_q);
-
-
-/*
- * OPS
- */
-
-int move_file(queue_t *queue);
 
 #endif /* CLOUDTIERING_H */
 

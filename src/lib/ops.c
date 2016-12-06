@@ -3,6 +3,7 @@
 #include <string.h>
 #include <errno.h>
 #include <stdlib.h>
+#include <pthread.h>
 #include <sys/types.h>
 #include <attr/xattr.h>
 #include <sys/stat.h>
@@ -116,16 +117,6 @@ static int is_file_local(const char *path) {
         return 1; /* true; file is local */
 }
 
-static int move_file_out(const char *path) {
-
-
-        return -1;
-}
-
-static int move_file_in(const char *path) {
-        return -1;
-}
-
 static int is_valid_path(const char *path) {
         struct stat path_stat;
         if ((stat(path, &path_stat) == -1) || !S_ISREG(path_stat.st_mode)) {
@@ -166,13 +157,13 @@ int move_file(queue_t *queue) {
 
                 if (is_file_local(buf)) {
                         /* local files should be moved out */
-                        if (move_file_out(buf) == -1) {
+                        if (getconf()->ops.move_file_out(buf) == -1) {
                                 LOG(ERROR, "unable to move out file %s", buf);
                                 return -1;
                         }
                 } else {
                         /* remote files should be moved in */
-                        if (move_file_in(buf) == -1) {
+                        if (getconf()->ops.move_file_in(buf) == -1) {
                                 LOG(ERROR, "unable to move in file %s", buf);
                                 return -1;
                         }
@@ -183,7 +174,11 @@ int move_file(queue_t *queue) {
         return 0;
 }
 
-int init_remote_store_access() {
+
+/**************************
+ * S3 Protocol Operations *
+ **************************/
+int s3_init_remote_store_access(void) {
         S3Status status = S3_initialize(NULL, S3_INIT_ALL, getconf()->s3_default_hostname);
 
         if (status == S3StatusOK) {
@@ -206,16 +201,31 @@ int init_remote_store_access() {
                 return -1;
         }
 
-        status = S3_validate_bucket_name(getconf()->s3_bucket, S3UriStyleVirtualHost);
+        /* validates bucket name, not its availability */
+        status = S3_validate_bucket_name(getconf()->s3_bucket, S3UriStylePath);
         if (status == S3StatusOK) {
                 return 0;
         } else {
-                LOG(ERROR, "not valid bucket name for virtual host bucket style (error: %s)",
+                LOG(ERROR, "not valid bucket name for path bucket style (error: %s)",
                     S3_get_status_name(status));
                 return -1;
         }
 
         return -1; /* unreachable place */
+}
+
+int s3_move_file_out(const char *path) {
+        /* TODO: implement this method */
+        return -1;
+}
+
+int s3_move_file_in(const char *path) {
+        /* TODO: implement this method */
+        return -1;
+}
+
+void s3_term_remote_store_access(void) {
+        S3_deinitialize();
 }
 
 static S3Status test_bucket_status;
