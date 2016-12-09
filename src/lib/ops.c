@@ -20,6 +20,7 @@
 /* more than enough to store errno descriptions */
 #define ERR_MSG_BUF_LEN    1024
 
+
 /*
  * Definitions related to extended attributes used to store
  * information about remote storage object location.
@@ -40,6 +41,13 @@ static char *attr_list[] = {
        XATTR_OBJECT_ID,
 };
 
+/**
+ * @brief set_xattr Wrapper around setxattr() function with error handling.
+ * @param[in] path  Path to the target file.
+ * @param[in] key   Name of the extended attribute.
+ * @param[in] value Value to be set to extended attribute.
+ * @return 0 on success, -1 on failure
+ */
 static int set_xattr(const char *path, const char *key, const char *value) {
          /* create extended attribute or replace existing */
         int ret = setxattr(path, key, value, strlen(value) + 1, 0);
@@ -59,6 +67,14 @@ static int set_xattr(const char *path, const char *key, const char *value) {
         return 0;
 }
 
+/**
+ * @brief get_xattr Wrapper around getxattr() function with error handling.
+ * @param[in]     path      Path to the target file.
+ * @param[in]     key       Name of the extended attribute.
+ * @param[out]    value_buf Buffer that will contain value of extended attribute on success.
+ * @param[in,out] size      Size of probvided buffer. Will be set to 0 in case of attribute non-existance.
+ * @return 0 on success, -1 on failure
+ */
 static int get_xattr(const char *path, const char *key, char *value_buf, size_t *size) {
         ssize_t ret = getxattr(path, key, value_buf, *size);
         if (ret == -1) {
@@ -83,13 +99,19 @@ static int get_xattr(const char *path, const char *key, char *value_buf, size_t 
         return 0;
 }
 
-static void remove_xattr(const char *path, const char *key) {
+/**
+ * @brief remove_xattr Wrapper around removexattr() function with error handling.
+ * @param[in] path Path to the target file.
+ * @param[in] key  Name of the extended attribute.
+ * @return 0 on success, -1 on failure
+ */
+static int remove_xattr(const char *path, const char *key) {
         /* handle all possible errors here */
         int ret = removexattr(path, key);
         if (ret == -1) {
                 if (errno == ENOATTR) {
                         /* not a error, do not print error message */
-                        return;
+                        return 0;
                 }
 
                 /* using thead safe version of strerror() */
@@ -100,9 +122,18 @@ static void remove_xattr(const char *path, const char *key) {
 
                 LOG(DEBUG, "failed to remove extended attribute for %s [key: %s]; reason: %s",
                     path, key, err_buf);
+
+                return -1;
         }
+
+        return 0;
 }
 
+/**
+ * @brief is_file_local Check whether file data is on local store or on remote.
+ * @param[in] path Path to target file.
+ * @return 0 is file data on remote store and non-0 when file data on local store
+ */
 static int is_file_local(const char *path) {
         size_t sz = XATTR_MAX_SIZE_MAX;
 
@@ -117,6 +148,11 @@ static int is_file_local(const char *path) {
         return 1; /* true; file is local */
 }
 
+/**
+ * @brief is_valid_path Checks if path is valid - exists and is is regular file.
+ * @param[in] path Path to target file.
+ * @return 0 if path is not valid and non-0 if path is valid.
+ */
 static int is_valid_path(const char *path) {
         struct stat path_stat;
         if ((stat(path, &path_stat) == -1) || !S_ISREG(path_stat.st_mode)) {
@@ -128,6 +164,7 @@ static int is_valid_path(const char *path) {
 
 /**
  * @brief move_file Move file on the front of the queue in or out (obvious from the file attributes).
+ * @param[in] queue Queue with candidate files for moving in or out.
  * @return -1 on failure; 0 on success
  */
 int move_file(queue_t *queue) {
