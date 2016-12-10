@@ -29,6 +29,7 @@ static DOTCONF_CB(s3_bucket);
 static DOTCONF_CB(s3_access_key_id);
 static DOTCONF_CB(s3_secret_access_key);
 static DOTCONF_CB(remote_store_protocol);
+static DOTCONF_CB(transfer_protocol);
 
 
 /*
@@ -152,6 +153,7 @@ static const configoption_t options[] = {
         { "S3Bucket",                ARG_STR,    s3_bucket,                NULL, ctx_S3RemoteStore },
         { "S3AccessKeyId",           ARG_STR,    s3_access_key_id,         NULL, ctx_S3RemoteStore },
         { "S3SecretAccessKey",       ARG_STR,    s3_secret_access_key,     NULL, ctx_S3RemoteStore },
+        { "TransferProtocol",        ARG_STR,    transfer_protocol,        NULL, ctx_S3RemoteStore },
         { end_S3RemoteStore_sect,    ARG_NONE,   close_S3RemoteStore_sect, NULL, CTX_ALL           },
         LAST_OPTION
 };
@@ -220,6 +222,11 @@ static DOTCONF_CB(remote_store_protocol) {
                 return "unsupported remote store protocol";
         }
 
+        return NULL;
+}
+
+static DOTCONF_CB(transfer_protocol) {
+        strcpy(conf->transfer_protocol, cmd->data.str);
         return NULL;
 }
 

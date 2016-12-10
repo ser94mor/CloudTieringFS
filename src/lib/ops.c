@@ -11,14 +11,10 @@
 
 #include "cloudtiering.h"
 
-/* macroses calculating maximum among macrosed values */
-#define MAX_2(x1, x2)         ( ((x1) > (x2)) ? (x1) : (x2) )
-#define MAX_3(x1, x2, x3)     ( ((x1) > (MAX_2(x2,x3))) ? (x1) : (MAX_2(x2,x3)) )
-#define MAX_4(x1, x2, x3, x4) ( ((x1) > (MAX_3(x2,x3,x4))) ? (x1) : (MAX_3(x2,x3,x4)) )
-#define MAX    MAX_2
-
-/* more than enough to store errno descriptions */
+/* thread-local buffer for error messages;
+ * 1024 is more than enough to store errno descriptions */
 #define ERR_MSG_BUF_LEN    1024
+static __thread char err_buf[ERR_MSG_BUF_LEN];
 
 
 /*
@@ -26,19 +22,28 @@
  * information about remote storage object location.
  */
 #define XATTR_NAMESPACE             "trusted"
-#define XATTR_KEY(short_xattr)      XATTR_NAMESPACE "." short_xattr
+#define LOCAL_STORE                 0x01
+#define REMOTE_STORE                0x10
 
-#define XATTR_OBJECT_ID             XATTR_KEY("object_id")
-#define XATTR_OBJECT_ID_MAX_SIZE    S3_MAX_KEY_SIZE    /* defined in libs3.h */
+/* S3_MAX_KEY_SIZE is defined in libs3.h */
+#define FOREACH_XATTR(action) \
+        action(s3_object_id, S3_MAX_KEY_SIZE) \
+        action(location, sizeof(unsigned char))
 
-/* maximum possible maximum size of all valid extended attributes */
-#define XATTR_MAX_SIZE_MAX          MAX( \
-                                        XATTR_OBJECT_ID_MAX_SIZE, \
-                                        -1 \
-                                    )
+#define XATTR_ENUM(key, size)        key,
+#define XATTR_STR(key, size)         XATTR_NAMESPACE "." #key,
+#define XATTR_MAX_SIZE(key, size)    size,
 
-static char *attr_list[] = {
-       XATTR_OBJECT_ID,
+enum xattr_enum {
+        FOREACH_XATTR(XATTR_ENUM)
+};
+
+static char *xattr_str[] = {
+        FOREACH_XATTR(XATTR_STR)
+};
+
+static size_t xattr_max_size[] = {
+        FOREACH_XATTR(XATTR_MAX_SIZE)
 };
 
 /**
@@ -48,12 +53,11 @@ static char *attr_list[] = {
  * @param[in] value Value to be set to extended attribute.
  * @return 0 on success, -1 on failure
  */
-static int set_xattr(const char *path, const char *key, const char *value) {
+static int set_xattr(const char *path, const char *key, const char *value, const size_t size) {
          /* create extended attribute or replace existing */
-        int ret = setxattr(path, key, value, strlen(value) + 1, 0);
+        int ret = setxattr(path, key, value, size, 0);
         if (ret == -1) {
                 /* use thead safe version of strerror() */
-                char err_buf[ERR_MSG_BUF_LEN];
                 if (strerror_r(errno, err_buf, ERR_MSG_BUF_LEN) == -1) {
                         err_buf[0] = '\0'; /* very unlikely */
                 }
@@ -85,7 +89,6 @@ static int get_xattr(const char *path, const char *key, char *value_buf, size_t 
                 }
 
                 /* using thead safe version of strerror() */
-                char err_buf[ERR_MSG_BUF_LEN];
                 if (strerror_r(errno, err_buf, ERR_MSG_BUF_LEN) == -1) {
                         err_buf[0] = '\0'; /* very unlikely */
                 }
@@ -115,7 +118,6 @@ static int remove_xattr(const char *path, const char *key) {
                 }
 
                 /* using thead safe version of strerror() */
-                char err_buf[ERR_MSG_BUF_LEN];
                 if (strerror_r(errno, err_buf, ERR_MSG_BUF_LEN) == -1) {
                         err_buf[0] = '\0'; /* very unlikely */
                 }
@@ -132,20 +134,18 @@ static int remove_xattr(const char *path, const char *key) {
 /**
  * @brief is_file_local Check whether file data is on local store or on remote.
  * @param[in] path Path to target file.
- * @return 0 is file data on remote store and non-0 when file data on local store
+ * @return 0 is file data on remote store and >0 when file data on local store; -1 on error
  */
 static int is_file_local(const char *path) {
-        size_t sz = XATTR_MAX_SIZE_MAX;
+        size_t size = xattr_max_size[location];
+        unsigned char location = 0; /* an actual value will be assigned in get_xattr() */
 
-        /* do not care about return value, care only about sz value */
-        for (int i = 0; i < sizeof(attr_list) / sizeof(attr_list[0]); i++) {
-                get_xattr(path, attr_list[i], NULL, &sz);
-                if (sz != 0) {
-                        return 0; /* false; file is not local */
-                }
+        int ret = get_xattr(path, xattr_str[location], (char *)&location, &size);
+        if (ret == -1) {
+                return -1; /* something bad happen; report error */
         }
 
-        return 1; /* true; file is local */
+        return ((location == LOCAL_STORE) || (size == 0));
 }
 
 /**
@@ -215,8 +215,39 @@ int move_file(queue_t *queue) {
 /**************************
  * S3 Protocol Operations *
  **************************/
+static S3BucketContext bucketContext;
+
+static S3Status
+responsePropertiesCallback(const S3ResponseProperties *properties, void *callbackData) {
+        return S3StatusOK;
+}
+
+static void
+responseCompleteCallback(S3Status status, const S3ErrorDetails *error, void *callbackData) {
+        return;
+}
+
+static S3ResponseHandler responseHandler = {
+        .propertiesCallback = &responsePropertiesCallback,
+        .completeCallback = &responseCompleteCallback
+};
+
+static void s3_init_data(S3BucketContext *bc, S3Protocol tp) {
+        conf_t *conf = getconf();
+
+        bc->hostName        = conf->s3_default_hostname;
+        bc->bucketName      = conf->s3_bucket;
+        bc->protocol        = tp;
+        bc->uriStyle        = S3UriStylePath;
+        bc->accessKeyId     = conf->s3_access_key_id;
+        bc->secretAccessKey = conf->s3_secret_access_key;
+        bc->securityToken   = NULL;
+}
+
 int s3_init_remote_store_access(void) {
-        S3Status status = S3_initialize(NULL, S3_INIT_ALL, getconf()->s3_default_hostname);
+        conf_t *conf = getconf();
+
+        S3Status status = S3_initialize(NULL, S3_INIT_ALL, conf->s3_default_hostname);
 
         if (status == S3StatusOK) {
                 return 0;
@@ -224,7 +255,7 @@ int s3_init_remote_store_access(void) {
 
         if (status == S3StatusUriTooLong) {
                 LOG(ERROR, "default s3 hostname %s is longer than %d (error: %s)",
-                    getconf()->s3_default_hostname, S3_MAX_HOSTNAME_SIZE, S3_get_status_name(status));
+                    conf->s3_default_hostname, S3_MAX_HOSTNAME_SIZE, S3_get_status_name(status));
                 return -1;
         } else if (status == S3StatusInternalError) {
                 LOG(ERROR, "libs3 dependent libraries could not be initialized (error: %s)",
@@ -239,16 +270,30 @@ int s3_init_remote_store_access(void) {
         }
 
         /* validates bucket name, not its availability */
-        status = S3_validate_bucket_name(getconf()->s3_bucket, S3UriStylePath);
-        if (status == S3StatusOK) {
-                return 0;
-        } else {
+        status = S3_validate_bucket_name(conf->s3_bucket, S3UriStylePath);
+        if (status != S3StatusOK) {
                 LOG(ERROR, "not valid bucket name for path bucket style (error: %s)",
                     S3_get_status_name(status));
                 return -1;
         }
 
-        return -1; /* unreachable place */
+        S3Protocol transfer_protocol = strcmp(conf->transfer_protocol, "http") == 0 ?
+                                               S3ProtocolHTTP : S3ProtocolHTTPS;
+        s3_init_data(&bucketContext, transfer_protocol);
+
+        S3_create_bucket(transfer_protocol,
+                         conf->s3_access_key_id,
+                         conf->s3_secret_access_key,
+                         NULL,
+                         conf->s3_default_hostname,
+                         conf->s3_bucket,
+                         S3CannedAclPrivate,
+                         NULL,
+                         NULL,
+                         &responseHandler,
+                         NULL);
+
+        return 0;
 }
 
 int s3_move_file_out(const char *path) {

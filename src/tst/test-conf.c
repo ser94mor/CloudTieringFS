@@ -28,6 +28,7 @@ static const char *test_conf_str = "<General>\n"                             \
                                    "    S3Bucket                 s3.bucket\n"          \
                                    "    S3AccessKeyId            test_access_key_id\n" \
                                    "    S3SecretAccessKey        test_secret_key\n"    \
+                                   "    TransferProtocol         https\n"              \
                                    "</S3RemoteStore>\n";
 
 static int create_test_conf_file() {
@@ -81,6 +82,7 @@ int test_conf(char *err_msg) {
             strcmp(conf->s3_access_key_id, "test_access_key_id") ||
             strcmp(conf->s3_secret_access_key, "test_secret_key") ||
             strcmp(conf->remote_store_protocol, "s3") ||
+            strcmp(conf->transfer_protocol, "https") ||
             conf->scanfs_iter_tm_sec != 100 ||
             conf->scanfs_max_fails != 1 ||
             conf->move_file_max_fails != 2 ||
