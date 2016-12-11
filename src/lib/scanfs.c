@@ -10,7 +10,7 @@
 
 /* queue might be full and we need to perform several attempts giving a chance
  * for other threads to pop elements from queue */
-#define QUEUE_PUSH_RETRIES              3
+#define QUEUE_PUSH_RETRIES              5
 #define QUEUE_PUSH_ATTEMPT_SLEEP_SEC    1
 
 static const queue_t *in_queue  = NULL;

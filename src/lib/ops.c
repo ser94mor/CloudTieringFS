@@ -215,33 +215,116 @@ int move_file(queue_t *queue) {
 /**************************
  * S3 Protocol Operations *
  **************************/
-static S3BucketContext bucketContext;
+/* how many times retriable s3 operation should be retried */
+#define S3_RETRIES    5
+static S3BucketContext g_bucket_context;
+
+enum cb_type {
+        cb_TEST_BUCKET = 0,
+        cb_CREATE_BUCKET = 1,
+        cb_PUT_OBJECT = 2,
+        cb_GET_OBJECT = 3,
+};
+
+struct cb_data {
+        enum cb_type type; /* method identifier */
+        S3Status status; /* request status */
+        void *data; /* some data */
+};
 
 static S3Status
-responsePropertiesCallback(const S3ResponseProperties *properties, void *callbackData) {
+response_properties_callback(const S3ResponseProperties *properties, void *callbackData) {
         return S3StatusOK;
 }
 
 static void
-responseCompleteCallback(S3Status status, const S3ErrorDetails *error, void *callbackData) {
+response_complete_callback(S3Status status, const S3ErrorDetails *error, void *callback_data) {
+        struct cb_data *cb_d = (struct cb_data *)callback_data;
+        cb_d->status = status;
+
         return;
 }
 
-static S3ResponseHandler responseHandler = {
-        .propertiesCallback = &responsePropertiesCallback,
-        .completeCallback = &responseCompleteCallback
+static S3ResponseHandler response_handler = {
+        .propertiesCallback = &response_properties_callback,
+        .completeCallback   = &response_complete_callback
 };
 
-static void s3_init_data(S3BucketContext *bc, S3Protocol tp) {
+static void s3_init_globals(void) {
         conf_t *conf = getconf();
 
-        bc->hostName        = conf->s3_default_hostname;
-        bc->bucketName      = conf->s3_bucket;
-        bc->protocol        = tp;
-        bc->uriStyle        = S3UriStylePath;
-        bc->accessKeyId     = conf->s3_access_key_id;
-        bc->secretAccessKey = conf->s3_secret_access_key;
-        bc->securityToken   = NULL;
+        S3Protocol transfer_protocol = strcmp(conf->transfer_protocol, "http") == 0 ?
+                                              S3ProtocolHTTP : S3ProtocolHTTPS;
+
+        g_bucket_context.hostName        = conf->s3_default_hostname;
+        g_bucket_context.bucketName      = conf->s3_bucket;
+        g_bucket_context.protocol        = transfer_protocol;
+        g_bucket_context.uriStyle        = S3UriStylePath;
+        g_bucket_context.accessKeyId     = conf->s3_access_key_id;
+        g_bucket_context.secretAccessKey = conf->s3_secret_access_key;
+        g_bucket_context.securityToken   = NULL;
+}
+
+static int s3_bucket_exists(void) {
+        /* create bucket if it does not already exist */
+        int retries = S3_RETRIES;
+
+        /* prepare callback data structure */
+        struct cb_data callback_data = {
+                .type = cb_TEST_BUCKET,
+        };
+
+        /* test the existance of bucket */
+        char location_constraint[64];
+        do {
+                S3_test_bucket(g_bucket_context.protocol,
+                               S3UriStylePath,
+                               g_bucket_context.accessKeyId,
+                               g_bucket_context.secretAccessKey,
+                               NULL,
+                               g_bucket_context.hostName,
+                               g_bucket_context.bucketName,
+                               sizeof(location_constraint),
+                               location_constraint,
+                               NULL,
+                               &response_handler,
+                               &callback_data);
+        } while (S3_status_is_retryable(callback_data.status) && --retries);
+
+        /* true if exists; if not exist and on error - false */
+        return (callback_data.status == S3StatusOK);
+}
+
+static int s3_create_bucket(void) {
+        /* create bucket if it does not already exist */
+        int retries = S3_RETRIES;
+
+        struct cb_data callback_data = {
+                .type = cb_CREATE_BUCKET,
+        };
+
+        /* create bucket if it does not already exist */
+        do {
+                S3_create_bucket(g_bucket_context.protocol,
+                                 g_bucket_context.accessKeyId,
+                                 g_bucket_context.secretAccessKey,
+                                 NULL,
+                                 g_bucket_context.hostName,
+                                 g_bucket_context.bucketName,
+                                 S3CannedAclPrivate,
+                                 NULL, NULL, &response_handler, &callback_data);
+        } while (S3_status_is_retryable(callback_data.status) && --retries);
+
+        /* fail on any error */
+        if (callback_data.status != S3StatusOK) {
+                return -1;
+        }
+
+        return 0;
+}
+
+static int s3_put_object(void) {
+        return -1;
 }
 
 int s3_init_remote_store_access(void) {
@@ -249,11 +332,10 @@ int s3_init_remote_store_access(void) {
 
         S3Status status = S3_initialize(NULL, S3_INIT_ALL, conf->s3_default_hostname);
 
-        if (status == S3StatusOK) {
-                return 0;
-        }
 
-        if (status == S3StatusUriTooLong) {
+        if (status == S3StatusOK) {
+                /* success */
+        } else if (status == S3StatusUriTooLong) {
                 LOG(ERROR, "default s3 hostname %s is longer than %d (error: %s)",
                     conf->s3_default_hostname, S3_MAX_HOSTNAME_SIZE, S3_get_status_name(status));
                 return -1;
@@ -277,21 +359,17 @@ int s3_init_remote_store_access(void) {
                 return -1;
         }
 
-        S3Protocol transfer_protocol = strcmp(conf->transfer_protocol, "http") == 0 ?
-                                               S3ProtocolHTTP : S3ProtocolHTTPS;
-        s3_init_data(&bucketContext, transfer_protocol);
+        s3_init_globals();
 
-        S3_create_bucket(transfer_protocol,
-                         conf->s3_access_key_id,
-                         conf->s3_secret_access_key,
-                         NULL,
-                         conf->s3_default_hostname,
-                         conf->s3_bucket,
-                         S3CannedAclPrivate,
-                         NULL,
-                         NULL,
-                         &responseHandler,
-                         NULL);
+        /* create bucket if it does not exist, if it already exists do nothing */
+        if (!s3_bucket_exists()) {
+                if (s3_create_bucket() == -1) {
+                        LOG(ERROR, "failed to create bucket %s", conf->s3_bucket);
+                        return -1;
+                }
+        }
+
+        LOG(INFO, "access to remote store setup successfully");
 
         return 0;
 }
@@ -308,97 +386,4 @@ int s3_move_file_in(const char *path) {
 
 void s3_term_remote_store_access(void) {
         S3_deinitialize();
-}
-
-static S3Status test_bucket_status;
-static char test_bucket_error_details[4096] = { 0 };
-
-static S3Status test_bucket_properties_callback(const S3ResponseProperties *properties, void *callbackData) {
-    return S3StatusOK;
-}
-
-static void test_bucket_complete_callback(S3Status status, const S3ErrorDetails *error, void *callbackData) {
-    (void) callbackData;
-
-    test_bucket_status = status;
-    // Compose the error details message now, although we might not use it.
-    // Can't just save a pointer to [error] since it's not guaranteed to last
-    // beyond this callback
-    int len = 0;
-    if (error && error->message) {
-        len += snprintf(&(test_bucket_error_details[len]), sizeof(test_bucket_error_details) - len,
-                        "  Message: %s\n", error->message);
-    }
-    if (error && error->resource) {
-        len += snprintf(&(test_bucket_error_details[len]), sizeof(test_bucket_error_details) - len,
-                        "  Resource: %s\n", error->resource);
-    }
-    if (error && error->furtherDetails) {
-        len += snprintf(&(test_bucket_error_details[len]), sizeof(test_bucket_error_details) - len,
-                        "  Further Details: %s\n", error->furtherDetails);
-    }
-    if (error && error->extraDetailsCount) {
-        len += snprintf(&(test_bucket_error_details[len]), sizeof(test_bucket_error_details) - len,
-                        "%s", "  Extra Details:\n");
-        int i;
-        for (i = 0; i < error->extraDetailsCount; i++) {
-            len += snprintf(&(test_bucket_error_details[len]),
-                            sizeof(test_bucket_error_details) - len, "    %s: %s\n",
-                            error->extraDetails[i].name,
-                            error->extraDetails[i].value);
-        }
-    }
-}
-
-
-/**
- * Following function was initially copied from s3.c located in
- * https://github.com/bji/libs3/blob/master/src/s3.c and then modified.
- */
-static void test_bucket(int argc, char **argv, int optindex)
-{
-    const char *bucketName = getconf()->s3_bucket;
-
-    S3ResponseHandler response_handler = { &test_bucket_properties_callback,
-                                           &test_bucket_complete_callback };
-
-    char location_constraint[64];
-    int retries = 5;
-    do {
-        S3_test_bucket(S3ProtocolHTTPS, S3UriStylePath,
-                       getconf()->s3_access_key_id, getconf()->s3_secret_access_key, 0,
-                       0, bucketName, sizeof(location_constraint),
-                       location_constraint, 0, &response_handler, 0);
-        --retries;
-    } while (S3_status_is_retryable(test_bucket_status) && retries > 0);
-
-    const char *result;
-
-    switch (test_bucket_status) {
-    case S3StatusOK:
-        // bucket exists
-        result = location_constraint[0] ? location_constraint : "USA";
-        break;
-    case S3StatusErrorNoSuchBucket:
-        result = "Does Not Exist";
-        break;
-    case S3StatusErrorAccessDenied:
-        result = "Access Denied";
-        break;
-    default:
-        result = 0;
-        break;
-    }
-
-    if (result) {
-        LOG(DEBUG, "%-56s  %-20s\n%s%s\n%-56s  %-20s\n",
-            "                         Bucket",
-            "       Status",
-            "--------------------------------------------------------  ",
-            "--------------------",
-            bucketName, result);
-    }
-    else {
-        LOG(ERROR, "error: %s", S3_get_status_name(test_bucket_status));
-    }
 }

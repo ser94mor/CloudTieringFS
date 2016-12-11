@@ -100,6 +100,11 @@ static int init_data(queue_t **in_out_queue) {
                 return -1;
         }
 
+        if (conf->ops.init_remote_store_access() == -1) {
+                LOG(ERROR, "unable to establish connection to remote store");
+                return -1;
+        }
+
         return 0;
 }
 
