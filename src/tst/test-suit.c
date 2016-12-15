@@ -10,7 +10,7 @@ static struct test_case {
 } test_suit[] = {
         { "conf",  test_conf },
         { "log",   test_log },
-        { "queue", test_queue }
+        { "queue", test_queue },
 };
 
 int main(int argc, char *argv[]) {
