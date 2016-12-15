@@ -233,21 +233,22 @@ struct cb_data {
 };
 
 static S3Status
-response_properties_callback(const S3ResponseProperties *properties, void *callbackData) {
+s3_response_properties_callback(const S3ResponseProperties *properties, void *callbackData) {
         return S3StatusOK;
 }
 
 static void
-response_complete_callback(S3Status status, const S3ErrorDetails *error, void *callback_data) {
+s3_response_complete_callback(S3Status status, const S3ErrorDetails *error, void *callback_data) {
         struct cb_data *cb_d = (struct cb_data *)callback_data;
         cb_d->status = status;
 
+        LOG(ERROR, S3_get_status_name(status));
         return;
 }
 
 static S3ResponseHandler response_handler = {
-        .propertiesCallback = &response_properties_callback,
-        .completeCallback   = &response_complete_callback
+        .propertiesCallback = &s3_response_properties_callback,
+        .completeCallback   = &s3_response_complete_callback
 };
 
 static void s3_init_globals(void) {
