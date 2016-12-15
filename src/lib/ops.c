@@ -217,19 +217,30 @@ int move_file(queue_t *queue) {
  **************************/
 /* how many times retriable s3 operation should be retried */
 #define S3_RETRIES    5
+
+/*  context for working with objects within a bucket. Initialized only once. */
 static S3BucketContext g_bucket_context;
 
-enum cb_type {
-        cb_TEST_BUCKET = 0,
-        cb_CREATE_BUCKET = 1,
-        cb_PUT_OBJECT = 2,
-        cb_GET_OBJECT = 3,
+/* enum of s3 operation types; used to determine callback behaviour */
+enum s3_cb_type {
+        s3_cb_TEST_BUCKET,
+        s3_cb_CREATE_BUCKET,
+        s3_cb_PUT_OBJECT,
+        s3_cb_GET_OBJECT,
 };
 
-struct cb_data {
-        enum cb_type type; /* method identifier */
+/* used as in and out a parameter for s3_response_complete_callback() */
+struct s3_cb_data {
+        enum s3_cb_type type; /* method identifier */
         S3Status status; /* request status */
         void *data; /* some data */
+};
+
+
+/* used in s3_put_object_data_callback(); convinient to give file's stuff as a single argument */
+struct s3_put_object_callback_data {
+    FILE *infile;
+    uint64_t content_length;
 };
 
 static S3Status
@@ -239,14 +250,14 @@ s3_response_properties_callback(const S3ResponseProperties *properties, void *ca
 
 static void
 s3_response_complete_callback(S3Status status, const S3ErrorDetails *error, void *callback_data) {
-        struct cb_data *cb_d = (struct cb_data *)callback_data;
+        struct s3_cb_data *cb_d = (struct s3_cb_data *)callback_data;
         cb_d->status = status;
 
         LOG(ERROR, S3_get_status_name(status));
         return;
 }
 
-static S3ResponseHandler response_handler = {
+static S3ResponseHandler g_response_handler = {
         .propertiesCallback = &s3_response_properties_callback,
         .completeCallback   = &s3_response_complete_callback
 };
@@ -271,8 +282,8 @@ static int s3_bucket_exists(void) {
         int retries = S3_RETRIES;
 
         /* prepare callback data structure */
-        struct cb_data callback_data = {
-                .type = cb_TEST_BUCKET,
+        struct s3_cb_data callback_data = {
+                .type = s3_cb_TEST_BUCKET,
         };
 
         /* test the existance of bucket */
@@ -288,7 +299,7 @@ static int s3_bucket_exists(void) {
                                sizeof(location_constraint),
                                location_constraint,
                                NULL,
-                               &response_handler,
+                               &g_response_handler,
                                &callback_data);
         } while (S3_status_is_retryable(callback_data.status) && --retries);
 
@@ -300,8 +311,8 @@ static int s3_create_bucket(void) {
         /* create bucket if it does not already exist */
         int retries = S3_RETRIES;
 
-        struct cb_data callback_data = {
-                .type = cb_CREATE_BUCKET,
+        struct s3_cb_data callback_data = {
+                .type = s3_cb_CREATE_BUCKET,
         };
 
         /* create bucket if it does not already exist */
@@ -313,7 +324,10 @@ static int s3_create_bucket(void) {
                                  g_bucket_context.hostName,
                                  g_bucket_context.bucketName,
                                  S3CannedAclPrivate,
-                                 NULL, NULL, &response_handler, &callback_data);
+                                 NULL,
+                                 NULL,
+                                 &g_response_handler,
+                                 &callback_data);
         } while (S3_status_is_retryable(callback_data.status) && --retries);
 
         /* fail on any error */
@@ -324,8 +338,90 @@ static int s3_create_bucket(void) {
         return 0;
 }
 
-static int s3_put_object(void) {
-        return -1;
+static int s3_put_object_data_callback(int buffer_size, char *buffer, void *callback_data) {
+    struct s3_put_object_callback_data *data = (struct s3_put_object_callback_data *)callback_data;
+
+    int ret = 0;
+
+    if (data->content_length) {
+        int toRead = ((data->content_length > (unsigned) buffer_size) ?
+                         (unsigned)buffer_size : data->content_length);
+        ret = fread(buffer, 1, toRead, data->infile);
+    }
+    data->content_length -= ret;
+
+    return ret;
+}
+
+static int s3_put_object(const char *path) {
+        int retries = S3_RETRIES;
+        int ret = 0; /* success by default */
+
+        /* set call back data type */
+        struct s3_cb_data callback_data = {
+                .type = s3_cb_PUT_OBJECT,
+        };
+
+        /* stat structure for target file to get content length */
+        struct stat statbuf;
+        if (stat(path, &statbuf) == -1) {
+                /* use thead safe version of strerror() */
+                if (strerror_r(errno, err_buf, ERR_MSG_BUF_LEN) == -1) {
+                        err_buf[0] = '\0'; /* very unlikely */
+                }
+
+                LOG(ERROR, "failed to stat file %s: %s", path, err_buf);
+
+                return -1;
+        }
+
+        /* initialize structure used during  */
+        struct s3_put_object_callback_data put_object_data;
+        put_object_data.content_length = statbuf.st_size;
+        if (!(put_object_data.infile = fopen(path, "r"))) {
+                /* use thead safe version of strerror() */
+                if (strerror_r(errno, err_buf, ERR_MSG_BUF_LEN) == -1) {
+                        err_buf[0] = '\0'; /* very unlikely */
+                }
+
+                LOG(ERROR, "failed to open input file %s: %s", path, err_buf);
+
+                return -1;
+        }
+
+        S3PutObjectHandler put_object_handler = {
+                .responseHandler = g_response_handler,
+                .putObjectDataCallback = &s3_put_object_data_callback,
+        };
+
+        do {
+                S3_put_object(&g_bucket_context,
+                              path,
+                              put_object_data.content_length,
+                              NULL,
+                              NULL,
+                              &put_object_handler,
+                              &callback_data);
+        } while(S3_status_is_retryable(callback_data.status) && --retries);
+
+        /* fail on any error */
+        if (callback_data.status != S3StatusOK) {
+                ret = -1;
+        }
+
+        if (fclose(put_object_data.infile)) {
+                /* this is usually caused by very serious system error */
+
+                /* use thead safe version of strerror() */
+                if (strerror_r(errno, err_buf, ERR_MSG_BUF_LEN) == -1) {
+                        err_buf[0] = '\0'; /* very unlikely */
+                }
+
+                LOG(ERROR, "failed to close file %s: %s", path, err_buf);
+                ret = -1;
+        }
+
+        return ret;
 }
 
 int s3_init_remote_store_access(void) {
