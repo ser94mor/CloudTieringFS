@@ -45,6 +45,29 @@ int queue_full(queue_t *queue) {
         return ret;
 }
 
+/**
+ * This function does not check input parameters and should be used only under locked mutex.
+ */
+static int queue_contains(queue_t *queue, char *item, size_t item_size) {
+        char *q_ptr = queue->head;
+        size_t sz = queue->cur_q_size;
+
+        while (sz != 0) {
+                if (q_ptr == (queue->buffer + queue->buffer_size)) {
+                        q_ptr = queue->buffer;
+                }
+
+                if ((*((size_t *)q_ptr) == item_size) &&
+                    strcmp(q_ptr + sizeof(size_t), item)) {
+                        return 1; /* true */
+                }
+
+                q_ptr += sizeof(size_t) + queue->max_item_size;
+                --sz;
+        }
+
+        return 0; /* false */
+}
 
 /**
  * @brief queue_push Push item into queue if there is enough place for this item.
@@ -59,6 +82,11 @@ int queue_push(queue_t *queue, char *item, size_t item_size) {
         pthread_mutex_lock(&queue->mutex);
 
         if (queue->cur_q_size == queue->max_q_size) {
+                pthread_mutex_unlock(&queue->mutex);
+                return -1;
+        }
+
+        if (queue_contains(queue, item, item_size)) {
                 pthread_mutex_unlock(&queue->mutex);
                 return -1;
         }

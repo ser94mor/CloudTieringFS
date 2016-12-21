@@ -18,12 +18,8 @@ static void *move_file_routine(void *args) {
         queue_t *queue = (queue_t *)args;
         conf_t  *conf = getconf();
 
-        time_t beg_time;  /* start of move_file execution */
-        time_t end_time;  /* finish of move_file execution */
-        unsigned long diff_time; /* difference between beg_time and end_time */
         int move_file_fails = 0;
         for (;;) {
-                beg_time = time(NULL);
                 if (move_file(queue) == -1 && conf->move_file_max_fails != -1) {
 
                         /* handle failure of move_file in case conf->move_file_fails has limit (!= -1) */
@@ -35,12 +31,6 @@ static void *move_file_routine(void *args) {
                         LOG(ERROR, "move_file execution failed (%d/%d)", move_file_fails, conf->move_file_max_fails);
                         continue;
                 }
-
-                /* we are here only when move_file operation was successful */
-                end_time = time(NULL);
-                diff_time = difftime(end_time, beg_time);
-
-                LOG(DEBUG, "successful move_file operation took %lu seconds to complete", diff_time);
         }
 
         return NULL; /* unreachable place */
@@ -52,12 +42,8 @@ static void *scanfs_routine(void *args) {
         queue_t *out_queue = in_out_q[1];
         conf_t *conf = getconf();
 
-        time_t beg_time;  /* start of scanfs execution */
-        time_t end_time;  /* finish of scanfs execution */
-        time_t diff_time; /* difference between beg_time and end_time */
         int scanfs_fails = 0;
         for (;;) {
-                beg_time = time(NULL);
                 if (scanfs(in_queue, out_queue) == -1 && conf->scanfs_max_fails != -1) {
 
                         /* handle failure of scanfs in case conf->scanfs_max_fails has limit (!= -1) */
@@ -68,12 +54,6 @@ static void *scanfs_routine(void *args) {
                         }
                         LOG(ERROR, "scanfs execution failed (%d/%d)", scanfs_fails, conf->scanfs_max_fails);
 
-                }
-                end_time = time(NULL);
-                diff_time = (time_t)difftime(end_time, beg_time);
-
-                if (diff_time < conf->scanfs_iter_tm_sec) {
-                        sleep((unsigned int)(conf->scanfs_iter_tm_sec - diff_time));
                 }
         }
 

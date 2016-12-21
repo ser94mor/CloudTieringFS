@@ -3,9 +3,14 @@
 
 #include <stdarg.h>
 #include <syslog.h>
+#include <stdio.h>
+#include <pthread.h>
 
 #include "log.h"
 
+
+static pthread_mutex_t _default_mutex;
+static unsigned long _default_seq_cnt = 0;
 
 /*
  * Functions and variables for 'syslog'.
@@ -51,7 +56,7 @@ void _syslog_close_log(void) {
  * @param name Not used.
  */
 void _default_open_log(const char *name) {
-        /* no action */
+        _default_mutex = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
 }
 
 /**
@@ -61,7 +66,24 @@ void _default_open_log(const char *name) {
  * @param ... Not used.
  */
 void _default_log(int level, const char *msg_fmt, ...) {
-        /* no action */
+        va_list args;
+        va_start(args, msg_fmt);
+
+        FILE *stream = (level == _default_ERROR) ? stderr : stdout;
+        const char *prefix = (level == _default_ERROR) ?
+                                 "ERROR" :
+                                 (level == _default_INFO) ? "INFO" : "DEBUG";
+
+
+        pthread_mutex_lock(&_default_mutex);
+        fprintf(stream, "%lu %s: ", _default_seq_cnt++, prefix);
+        vfprintf(stream, msg_fmt, args);
+        fprintf(stream, "\n");
+
+        fflush(stream);
+        pthread_mutex_unlock(&_default_mutex);
+
+        va_end(args);
 }
 
 /**

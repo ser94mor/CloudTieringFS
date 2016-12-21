@@ -13,8 +13,8 @@
 #define QUEUE_PUSH_RETRIES              5
 #define QUEUE_PUSH_ATTEMPT_SLEEP_SEC    1
 
-static const queue_t *in_queue  = NULL;
-static const queue_t *out_queue = NULL;
+static queue_t *in_queue  = NULL;
+static queue_t *out_queue = NULL;
 
 static int update_evict_queue(const char *fpath, const struct stat *sb,  int typeflag, struct FTW *ftwbuf) {
         int attempt = 0;
@@ -24,12 +24,10 @@ static int update_evict_queue(const char *fpath, const struct stat *sb,  int typ
                 return 0; /* just continue with the next files; non-zero will cause failure of nftw() */
         }
 
-        if (S_ISREG(path_stat.st_mode)) {
+        if (S_ISREG(path_stat.st_mode) && ((path_stat.st_atime + 600) < time(NULL))) {
                 do {
-                        if (queue_push((queue_t *)out_queue, (char *)fpath, strlen(fpath) + 1) == -1) {
+                        if (queue_push(out_queue, (char *)fpath, strlen(fpath) + 1) == -1) {
                                 ++attempt;
-                                LOG(DEBUG, "failed to push file name '%s' to out queue (attempt %d/%d)",
-                                    fpath, attempt, QUEUE_PUSH_RETRIES);
                                 continue;
                         }
                         LOG(DEBUG, "file '%s' pushed to out queue", fpath);

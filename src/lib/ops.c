@@ -16,7 +16,6 @@
 #define ERR_MSG_BUF_LEN    1024
 static __thread char err_buf[ERR_MSG_BUF_LEN];
 
-
 /*
  * Definitions related to extended attributes used to store
  * information about remote storage object location.
@@ -25,45 +24,73 @@ static __thread char err_buf[ERR_MSG_BUF_LEN];
 #define LOCAL_STORE                 0x01
 #define REMOTE_STORE                0x10
 
-/* S3_MAX_KEY_SIZE is defined in libs3.h */
+/*
+ * - S3_MAX_KEY_SIZE is defined in libs3.h
+ * - "locked" is extended attribute indicating that some thread is currently working with this file
+ */
 #define FOREACH_XATTR(action) \
-        action(s3_object_id, S3_MAX_KEY_SIZE) \
-        action(location, sizeof(unsigned char))
+        action(s3_object_id, S3_MAX_KEY_SIZE, char *) \
+        action(location, sizeof(unsigned char), unsigned char) \
+        action(locked, 0, void)
 
-#define XATTR_ENUM(key, size)        key,
-#define XATTR_STR(key, size)         XATTR_NAMESPACE "." #key,
-#define XATTR_MAX_SIZE(key, size)    size,
+#define XATTR_ENUM(key, size, type)       key,
+#define XATTR_STR(key, size, type)        XATTR_NAMESPACE "." #key,
+#define XATTR_MAX_SIZE(key, size, type)   size,
+#define XATTR_TYPEDEF(key, size, type)    typedef type xattr_##key##_t;
 
+/* declare enum of extended attributes */
 enum xattr_enum {
         FOREACH_XATTR(XATTR_ENUM)
 };
 
+/* declare array of extended attributes' keys */
 static char *xattr_str[] = {
         FOREACH_XATTR(XATTR_STR)
 };
 
+/* declare array of extended attributes' sizes */
 static size_t xattr_max_size[] = {
         FOREACH_XATTR(XATTR_MAX_SIZE)
 };
 
-/**
- * @brief set_xattr Wrapper around setxattr() function with error handling.
- * @param[in] path  Path to the target file.
- * @param[in] key   Name of the extended attribute.
- * @param[in] value Value to be set to extended attribute.
- * @return 0 on success, -1 on failure
- */
-static int set_xattr(const char *path, const char *key, const char *value, const size_t size) {
-         /* create extended attribute or replace existing */
-        int ret = setxattr(path, key, value, size, 0);
+/* declare types of extended attributes' values */
+FOREACH_XATTR(XATTR_TYPEDEF);
+
+static int is_file_locked(const char *path) {
+        int ret = getxattr(path, xattr_str[locked], NULL, 0);
+
         if (ret == -1) {
-                /* use thead safe version of strerror() */
-                if (strerror_r(errno, err_buf, ERR_MSG_BUF_LEN) == -1) {
-                        err_buf[0] = '\0'; /* very unlikely */
+                if (errno == ENOATTR) {
+                        return 0; /* false; not locked */
                 }
 
-                LOG(DEBUG, "failed to set extended attribute for %s [key: %s; value: %s]; reason: %s",
-                    path, key, value, err_buf);
+                /* strerror_r() with very low probability can fail; ignore such failures */
+                strerror_r(errno, err_buf, ERR_MSG_BUF_LEN);
+
+                LOG(ERROR,
+                    "failed to get extended attribute %s of file %s [reason: %s]",
+                    xattr_str[locked],
+                    path,
+                    err_buf);
+
+                return -1; /* error indication */
+        }
+
+        return 1; /* true; file is locked */
+}
+
+static int lock_file(const char *path) {
+        int ret = setxattr(path, xattr_str[locked], NULL, 0, XATTR_CREATE);
+
+        if (ret == -1) {
+                /* strerror_r() with very low probability can fail; ignore such failures */
+                strerror_r(errno, err_buf, ERR_MSG_BUF_LEN);
+
+                LOG(ERROR,
+                    "failed to set extended attribute %s to file %s [reason: %s]",
+                    xattr_str[locked],
+                    path,
+                    err_buf);
 
                 return -1;
         }
@@ -71,59 +98,18 @@ static int set_xattr(const char *path, const char *key, const char *value, const
         return 0;
 }
 
-/**
- * @brief get_xattr Wrapper around getxattr() function with error handling.
- * @param[in]     path      Path to the target file.
- * @param[in]     key       Name of the extended attribute.
- * @param[out]    value_buf Buffer that will contain value of extended attribute on success.
- * @param[in,out] size      Size of probvided buffer. Will be set to 0 in case of attribute non-existance.
- * @return 0 on success, -1 on failure
- */
-static int get_xattr(const char *path, const char *key, char *value_buf, size_t *size) {
-        ssize_t ret = getxattr(path, key, value_buf, *size);
+static int unlock_file(const char *path) {
+        int ret = removexattr(path, xattr_str[locked]);
+
         if (ret == -1) {
-                if (errno == ENOATTR) {
-                        /* attribute does not exist or process does not have an access to it */
-                        *size = 0;
-                        return 0;
-                }
+                /* strerror_r() with very low probability can fail; ignore such failures */
+                strerror_r(errno, err_buf, ERR_MSG_BUF_LEN);
 
-                /* using thead safe version of strerror() */
-                if (strerror_r(errno, err_buf, ERR_MSG_BUF_LEN) == -1) {
-                        err_buf[0] = '\0'; /* very unlikely */
-                }
-
-                LOG(DEBUG, "failed to get extended attribute for %s [key: %s]; reason: %s",
-                    path, key, err_buf);
-
-                return -1;
-        }
-
-        return 0;
-}
-
-/**
- * @brief remove_xattr Wrapper around removexattr() function with error handling.
- * @param[in] path Path to the target file.
- * @param[in] key  Name of the extended attribute.
- * @return 0 on success, -1 on failure
- */
-static int remove_xattr(const char *path, const char *key) {
-        /* handle all possible errors here */
-        int ret = removexattr(path, key);
-        if (ret == -1) {
-                if (errno == ENOATTR) {
-                        /* not a error, do not print error message */
-                        return 0;
-                }
-
-                /* using thead safe version of strerror() */
-                if (strerror_r(errno, err_buf, ERR_MSG_BUF_LEN) == -1) {
-                        err_buf[0] = '\0'; /* very unlikely */
-                }
-
-                LOG(DEBUG, "failed to remove extended attribute for %s [key: %s]; reason: %s",
-                    path, key, err_buf);
+                LOG(ERROR,
+                    "failed to remove extended attribute %s of file %s [reason: %s]",
+                    xattr_str[locked],
+                    path,
+                    err_buf);
 
                 return -1;
         }
@@ -138,14 +124,27 @@ static int remove_xattr(const char *path, const char *key) {
  */
 static int is_file_local(const char *path) {
         size_t size = xattr_max_size[location];
-        unsigned char location = 0; /* an actual value will be assigned in get_xattr() */
+        const char *xattr = xattr_str[location];
+        xattr_location_t location = 0;
 
-        int ret = get_xattr(path, xattr_str[location], (char *)&location, &size);
-        if (ret == -1) {
-                return -1; /* something bad happen; report error */
+        if (getxattr(path, xattr, &location, size) == -1) {
+                if (errno == ENOATTR) {
+                        return 1; /* true */
+                }
+
+                /* strerror_r() with very low probability can fail; ignore such failures */
+                strerror_r(errno, err_buf, ERR_MSG_BUF_LEN);
+
+                LOG(ERROR,
+                    "failed to get extended attribute %s of file %s [reason: %s]",
+                    xattr,
+                    path,
+                    err_buf);
+
+                return -1; /* error indication */
         }
 
-        return ((location == LOCAL_STORE) || (size == 0));
+        return (location == LOCAL_STORE);
 }
 
 /**
@@ -173,42 +172,47 @@ int move_file(queue_t *queue) {
                 size_t it_sz = 0;
                 char *path = queue_front(queue, &it_sz);
                 if (path == NULL) {
-                        LOG(ERROR, "failed to get front element of queue");
-                        return -1;
+                        strcpy(err_buf, "failed to get front element of queue");
+                        goto err;
                 }
 
-                /* save path to local variable to release memory in queue */
-                char buf[it_sz];
-                memcpy(buf, path, it_sz);
-                buf[it_sz - 1] = '\0';    /* ensure that buffer is terminated by \0 character */
-
-                if (queue_pop(queue) == -1) {
-                        LOG(ERROR, "unable to pop element from queue");
-                        return -1;
+                if (!is_valid_path(path)) {
+                        sprintf(err_buf, "path %s is not valid", path);
+                        goto err;
                 }
 
-                if (!is_valid_path(buf)) {
-                        LOG(ERROR, "path %s is not valid", buf);
-                        return -1;
-                }
+                int local_flag = 0;
+                if (is_file_local(path)) {
+                        local_flag = 1;
 
-                if (is_file_local(buf)) {
                         /* local files should be moved out */
-                        if (getconf()->ops.move_file_out(buf) == -1) {
-                                LOG(ERROR, "unable to move out file %s", buf);
-                                return -1;
+                        if (getconf()->ops.move_file_out(path) == -1) {
+                                sprintf(err_buf, "failed to move file %s out", path);
+                                goto err;
                         }
                 } else {
+                        local_flag = 0;
+
                         /* remote files should be moved in */
-                        if (getconf()->ops.move_file_in(buf) == -1) {
-                                LOG(ERROR, "unable to move in file %s", buf);
-                                return -1;
+                        if (getconf()->ops.move_file_in(path) == -1) {
+                                sprintf(err_buf, "failed to move file %s in", path);
+                                goto err;
                         }
                 }
+
+                queue_pop(queue);
+                LOG(INFO, "file %s successfully moved %s", path, (local_flag ? "in" : "out"));
+        } else {
+                //LOG(DEBUG, "queue is empty; nothing to move");
         }
 
         /* return successfully if there are no files to move or move in/out operation was successful */
         return 0;
+
+        err:
+        queue_pop(queue);
+        LOG(ERROR, "failed to move file [reason: %s]", err_buf);
+        return -1;
 }
 
 
@@ -233,6 +237,7 @@ enum s3_cb_type {
 struct s3_cb_data {
         enum s3_cb_type type; /* method identifier */
         S3Status status; /* request status */
+        char error_details[4096];
         void *data; /* some data */
 };
 
@@ -253,8 +258,30 @@ s3_response_complete_callback(S3Status status, const S3ErrorDetails *error, void
         struct s3_cb_data *cb_d = (struct s3_cb_data *)callback_data;
         cb_d->status = status;
 
-        LOG(ERROR, S3_get_status_name(status));
-        return;
+        int len = 0;
+        if (error && error->message) {
+                len += snprintf(&(cb_d->error_details[len]), sizeof(cb_d->error_details) - len,
+                                "  Message: %s\n", error->message);
+        }
+        if (error && error->resource) {
+                len += snprintf(&(cb_d->error_details[len]), sizeof(cb_d->error_details) - len,
+                                "  Resource: %s\n", error->resource);
+        }
+        if (error && error->furtherDetails) {
+                len += snprintf(&(cb_d->error_details[len]), sizeof(cb_d->error_details) - len,
+                                "  Further Details: %s\n", error->furtherDetails);
+        }
+        if (error && error->extraDetailsCount) {
+                len += snprintf(&(cb_d->error_details[len]), sizeof(cb_d->error_details) - len,
+                                "%s", "  Extra Details:\n");
+                int i;
+                for (i = 0; i < error->extraDetailsCount; i++) {
+                len += snprintf(&(cb_d->error_details[len]),
+                                sizeof(cb_d->error_details) - len, "    %s: %s\n",
+                                error->extraDetails[i].name,
+                                error->extraDetails[i].value);
+                }
+        }
 }
 
 static S3ResponseHandler g_response_handler = {
@@ -360,6 +387,7 @@ static int s3_put_object(const char *path) {
         /* set call back data type */
         struct s3_cb_data callback_data = {
                 .type = s3_cb_PUT_OBJECT,
+                .error_details = { 0 },
         };
 
         /* stat structure for target file to get content length */
@@ -406,6 +434,8 @@ static int s3_put_object(const char *path) {
 
         /* fail on any error */
         if (callback_data.status != S3StatusOK) {
+                LOG(ERROR, "S3_put_object() failed with error: %s", S3_get_status_name(callback_data.status));
+                LOG(ERROR, callback_data.error_details);
                 ret = -1;
         }
 
@@ -431,7 +461,7 @@ int s3_init_remote_store_access(void) {
 
 
         if (status == S3StatusOK) {
-                /* success */
+                LOG(DEBUG, "S3_initialize() executed successfully");
         } else if (status == S3StatusUriTooLong) {
                 LOG(ERROR, "default s3 hostname %s is longer than %d (error: %s)",
                     conf->s3_default_hostname, S3_MAX_HOSTNAME_SIZE, S3_get_status_name(status));
@@ -464,6 +494,7 @@ int s3_init_remote_store_access(void) {
                         LOG(ERROR, "failed to create bucket %s", conf->s3_bucket);
                         return -1;
                 }
+                LOG(DEBUG, "bucket %s created successfully", conf->s3_bucket);
         }
 
         LOG(INFO, "access to remote store setup successfully");
@@ -472,8 +503,30 @@ int s3_init_remote_store_access(void) {
 }
 
 int s3_move_file_out(const char *path) {
-        /* TODO: implement this method */
-        return -1;
+        if (s3_put_object(path) == -1) {
+                LOG(ERROR, "failed to put object into remote store for file %s", path);
+                return -1;
+        }
+        LOG(DEBUG, "file %s was uploaded to remote store successfully", path);
+
+        const char *key = xattr_str[s3_object_id];
+        const char *value = path;
+
+        if (setxattr(path, key, value, strlen(value) + 1, XATTR_CREATE) == -1) {
+                /* strerror_r() with very low probability can fail; ignore such failures */
+                strerror_r(errno, err_buf, ERR_MSG_BUF_LEN);
+
+                LOG(ERROR,
+                    "failed to set extended attribute %s with value %s to file %s [reason: %s]",
+                    key,
+                    path,
+                    path,
+                    err_buf);
+
+                return -1;
+        }
+
+        return 0;
 }
 
 int s3_move_file_in(const char *path) {
