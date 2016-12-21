@@ -1,12 +1,18 @@
 #define _POSIX_C_SOURCE    200112L    /* required for strerror_r() */
+#define _XOPEN_SOURCE 500    /* needed to use nftw() */
 
 #include <string.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <pthread.h>
+#include <unistd.h>
+#include <string.h>
+#include <ftw.h>
+#include <sys/resource.h>
 #include <sys/types.h>
 #include <attr/xattr.h>
 #include <sys/stat.h>
+#include <fcntl.h>
 #include <libs3.h>
 
 #include "cloudtiering.h"
@@ -366,7 +372,8 @@ static int s3_create_bucket(void) {
 }
 
 static int s3_put_object_data_callback(int buffer_size, char *buffer, void *callback_data) {
-    struct s3_put_object_callback_data *data = (struct s3_put_object_callback_data *)callback_data;
+    struct s3_put_object_callback_data *data =
+        (struct s3_put_object_callback_data *)(((struct s3_cb_data *)callback_data)->data);
 
     int ret = 0;
 
@@ -383,11 +390,13 @@ static int s3_put_object_data_callback(int buffer_size, char *buffer, void *call
 static int s3_put_object(const char *path) {
         int retries = S3_RETRIES;
         int ret = 0; /* success by default */
+        struct s3_put_object_callback_data put_object_data;
 
         /* set call back data type */
         struct s3_cb_data callback_data = {
                 .type = s3_cb_PUT_OBJECT,
                 .error_details = { 0 },
+                .data = &put_object_data,
         };
 
         /* stat structure for target file to get content length */
@@ -404,7 +413,6 @@ static int s3_put_object(const char *path) {
         }
 
         /* initialize structure used during  */
-        struct s3_put_object_callback_data put_object_data;
         put_object_data.content_length = statbuf.st_size;
         if (!(put_object_data.infile = fopen(path, "r"))) {
                 /* use thead safe version of strerror() */
@@ -503,6 +511,10 @@ int s3_init_remote_store_access(void) {
 }
 
 int s3_move_file_out(const char *path) {
+        if (lock_file(path) == -1) {
+                return -1;
+        }
+
         if (s3_put_object(path) == -1) {
                 LOG(ERROR, "failed to put object into remote store for file %s", path);
                 return -1;
@@ -510,7 +522,7 @@ int s3_move_file_out(const char *path) {
         LOG(DEBUG, "file %s was uploaded to remote store successfully", path);
 
         const char *key = xattr_str[s3_object_id];
-        const char *value = path;
+        xattr_s3_object_id_t value = path;
 
         if (setxattr(path, key, value, strlen(value) + 1, XATTR_CREATE) == -1) {
                 /* strerror_r() with very low probability can fail; ignore such failures */
@@ -526,7 +538,53 @@ int s3_move_file_out(const char *path) {
                 return -1;
         }
 
-        return 0;
+        key = xattr_str[location];
+        xattr_location_t location_val = REMOTE_STORE;
+
+        if (setxattr(path, key, &location_val, xattr_max_size[location], XATTR_CREATE) == -1) {
+                /* strerror_r() with very low probability can fail; ignore such failures */
+                strerror_r(errno, err_buf, ERR_MSG_BUF_LEN);
+
+                LOG(ERROR,
+                    "failed to set extended attribute %s with value %s to file %s [reason: %s]",
+                    key,
+                    path,
+                    path,
+                    err_buf);
+
+                return -1;
+        }
+
+        int ret = 0;
+        if (open(path, O_TRUNC | O_WRONLY) == -1) {
+                /* strerror_r() with very low probability can fail; ignore such failures */
+                strerror_r(errno, err_buf, ERR_MSG_BUF_LEN);
+
+                LOG(ERROR,
+                    "failed to execute open() to truncate file %s [reason: %s]",
+                    path,
+                    err_buf);
+
+                ret = -1;
+        }
+
+        if (close(path) == -1) {
+                /* strerror_r() with very low probability can fail; ignore such failures */
+                strerror_r(errno, err_buf, ERR_MSG_BUF_LEN);
+
+                LOG(ERROR,
+                    "failed to execute close() on file %s [reason: %s]",
+                    path,
+                    err_buf);
+
+                ret = -1;
+        }
+
+        if (unlock_file(path) == -1) {
+                ret = -1;
+        }
+
+        return ret;
 }
 
 int s3_move_file_in(const char *path) {
@@ -536,4 +594,69 @@ int s3_move_file_in(const char *path) {
 
 void s3_term_remote_store_access(void) {
         S3_deinitialize();
+}
+
+/*******************
+ * Scan filesystem *
+ * *****************/
+/* queue might be full and we need to perform several attempts giving a chance
+ * for other threads to pop elements from queue */
+#define QUEUE_PUSH_RETRIES              5
+#define QUEUE_PUSH_ATTEMPT_SLEEP_SEC    1
+
+static queue_t *in_queue  = NULL;
+static queue_t *out_queue = NULL;
+
+static int update_evict_queue(const char *fpath, const struct stat *sb,  int typeflag, struct FTW *ftwbuf) {
+        int attempt = 0;
+
+        struct stat path_stat;
+        if (stat(fpath, &path_stat) == -1) {
+                return 0; /* just continue with the next files; non-zero will cause failure of nftw() */
+        }
+
+        if (S_ISREG(path_stat.st_mode) &&
+            is_file_local(fpath) &&
+            !is_file_locked(fpath) &&
+            (path_stat.st_atime + 600) < time(NULL)) {
+                do {
+                        if (queue_push(out_queue, (char *)fpath, strlen(fpath) + 1) == -1) {
+                                ++attempt;
+                                continue;
+                        }
+                        LOG(DEBUG, "file '%s' pushed to out queue", fpath);
+                        break;
+                } while ((attempt < QUEUE_PUSH_RETRIES) && (queue_full((queue_t *)out_queue) > 0));
+        }
+
+        return 0;
+}
+
+int scanfs(queue_t *in_q, queue_t *out_q) {
+        conf_t *conf = getconf();
+
+        in_queue  = in_q;
+        out_queue = out_q;
+
+        /* set maximum number of open files for nftw to a half of descriptor table size for current process */
+        struct rlimit rlim;
+        if (getrlimit(RLIMIT_NOFILE, &rlim) == -1) {
+                return -1;
+        }
+
+        /* rlim_cur value will be +1 higher than actual according to documentation */
+        if (rlim.rlim_cur <= 2) {
+                /* there are 1 or less descriptors available */
+                return -1;
+        }
+        int nopenfd = rlim.rlim_cur / 2;
+
+        /* stay within filesystem and do not follow symlinks */
+        int flags = FTW_MOUNT | FTW_PHYS;
+
+        if (nftw(conf->fs_mount_point, update_evict_queue, nopenfd, flags) == -1) {
+                return -1;
+        }
+
+        return 0;
 }
