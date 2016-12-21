@@ -4,13 +4,10 @@
 #include <stdarg.h>
 #include <syslog.h>
 #include <stdio.h>
+#include <string.h>
 #include <pthread.h>
 
 #include "log.h"
-
-
-static pthread_mutex_t _default_mutex;
-static unsigned long _default_seq_cnt = 0;
 
 /*
  * Functions and variables for 'syslog'.
@@ -48,8 +45,11 @@ void _syslog_close_log(void) {
 
 
 /*
- * Functions for 'default'.
+ * Functions and variables for 'default'.
  */
+static pthread_mutex_t _default_mutex;
+static unsigned long _default_seq_cnt = 0;
+static FILE *_default_stream = NULL;
 
 /**
  * @brief default_open_log Default implementation of open_log function. Does nothing.
@@ -57,6 +57,22 @@ void _syslog_close_log(void) {
  */
 void _default_open_log(const char *name) {
         _default_mutex = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
+
+        const char *file_ext = ".log";
+        char filename[strlen(name) + strlen(file_ext) + 1];
+        sprintf(filename, "%s%s", name, file_ext);
+
+        pthread_mutex_lock(&_default_mutex);
+        _default_stream = fopen(filename, "a");
+        if (!_default_stream) {
+                _default_stream = stdout;
+                pthread_mutex_unlock(&_default_mutex);
+                _default_log(_default_ERROR,
+                             "unable to open file %s in append mode for logging; log to stdout instead",
+                             filename);
+                return;
+        }
+        pthread_mutex_unlock(&_default_mutex);
 }
 
 /**
@@ -69,18 +85,20 @@ void _default_log(int level, const char *msg_fmt, ...) {
         va_list args;
         va_start(args, msg_fmt);
 
-        FILE *stream = (level == _default_ERROR) ? stderr : stdout;
         const char *prefix = (level == _default_ERROR) ?
                                  "ERROR" :
                                  (level == _default_INFO) ? "INFO" : "DEBUG";
 
+        if (!_default_stream) {
+                _default_open_log("cloudtiering_UNKNOWN");
+        }
 
         pthread_mutex_lock(&_default_mutex);
-        fprintf(stream, "%lu %s: ", _default_seq_cnt++, prefix);
-        vfprintf(stream, msg_fmt, args);
-        fprintf(stream, "\n");
+        fprintf(_default_stream, "%lu %s: ", _default_seq_cnt++, prefix);
+        vfprintf(_default_stream, msg_fmt, args);
+        fprintf(_default_stream, "\n");
 
-        fflush(stream);
+        fflush(_default_stream);
         pthread_mutex_unlock(&_default_mutex);
 
         va_end(args);
@@ -90,5 +108,7 @@ void _default_log(int level, const char *msg_fmt, ...) {
  * @brief default_close_log Default implementation of close_log function. Does nothing.
  */
 void _default_close_log(void) {
-        /* no action */
+        if (fclose(_default_stream)) {
+                /* do not want to fail execution of all program; hence simply ignore this error */
+        }
 }

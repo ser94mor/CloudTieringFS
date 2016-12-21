@@ -182,7 +182,7 @@ int test_queue(char *err_msg) {
         return 0;
 
 err:
-        stream = fopen("./validate/test-queue.dump", "w");
+        stream = fopen("./test-queue.dump", "w");
         if (!stream) {
                 return -1;
         }

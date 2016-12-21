@@ -57,9 +57,9 @@ tst: mkdir-${BIN_DIR}/${TST_SUBDIR} lib ${TST_OBJ}
 	gcc -pthread ${TST_OBJ} -o ${BIN_DIR}/${TST_NAME} -L${BIN_DIR} -l:${LIB_NAME}
 
 
-validate: lib app tst
-	@pushd ${BIN_DIR} 1>/dev/null && \
-	LD_LIBRARY_PATH=. ./${TST_NAME} && \
+validate: lib app tst mkdir-${BIN_DIR}/validate
+	@pushd ${BIN_DIR}/validate 1>/dev/null && \
+	LD_LIBRARY_PATH=../ ../${TST_NAME} && \
 	popd 1>/dev/null
 
 

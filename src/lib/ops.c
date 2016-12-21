@@ -131,9 +131,9 @@ static int unlock_file(const char *path) {
 static int is_file_local(const char *path) {
         size_t size = xattr_max_size[location];
         const char *xattr = xattr_str[location];
-        xattr_location_t location = 0;
+        xattr_location_t loc = 0;
 
-        if (getxattr(path, xattr, &location, size) == -1) {
+        if (getxattr(path, xattr, &loc, size) == -1) {
                 if (errno == ENOATTR) {
                         return 1; /* true */
                 }
@@ -150,7 +150,7 @@ static int is_file_local(const char *path) {
                 return -1; /* error indication */
         }
 
-        return (location == LOCAL_STORE);
+        return !!(loc == LOCAL_STORE);
 }
 
 /**
@@ -517,12 +517,13 @@ int s3_move_file_out(const char *path) {
 
         if (s3_put_object(path) == -1) {
                 LOG(ERROR, "failed to put object into remote store for file %s", path);
+                /* TODO: unlock_file() in all error places */
                 return -1;
         }
         LOG(DEBUG, "file %s was uploaded to remote store successfully", path);
 
         const char *key = xattr_str[s3_object_id];
-        xattr_s3_object_id_t value = path;
+        xattr_s3_object_id_t value = (xattr_s3_object_id_t)path;
 
         if (setxattr(path, key, value, strlen(value) + 1, XATTR_CREATE) == -1) {
                 /* strerror_r() with very low probability can fail; ignore such failures */
@@ -556,7 +557,8 @@ int s3_move_file_out(const char *path) {
         }
 
         int ret = 0;
-        if (open(path, O_TRUNC | O_WRONLY) == -1) {
+        int fd;
+        if ((fd = open(path, O_TRUNC | O_WRONLY)) == -1) {
                 /* strerror_r() with very low probability can fail; ignore such failures */
                 strerror_r(errno, err_buf, ERR_MSG_BUF_LEN);
 
@@ -568,7 +570,7 @@ int s3_move_file_out(const char *path) {
                 ret = -1;
         }
 
-        if (close(path) == -1) {
+        if (close(fd) == -1) {
                 /* strerror_r() with very low probability can fail; ignore such failures */
                 strerror_r(errno, err_buf, ERR_MSG_BUF_LEN);
 

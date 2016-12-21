@@ -35,12 +35,7 @@ static int create_test_conf_file() {
         /* create configuration file */
         FILE *stream;
 
-        int ret = mkdir("./validate", S_IRWXU | S_IRWXG | S_IRWXO);
-        if (ret == -1 && errno != EEXIST) {
-                return -1;
-        }
-
-        stream = fopen("./validate/test.conf", "w");
+        stream = fopen("./test.conf", "w");
         if (!stream) {
                 return -1;
         }
@@ -59,7 +54,7 @@ static int create_test_conf_file() {
 
 int test_conf(char *err_msg) {
         if (create_test_conf_file() == -1) {
-                strcpy(err_msg, "unable to create configuration file ./validate/test.conf");
+                strcpy(err_msg, "unable to create configuration file ./test.conf");
                 return -1;
         }
 
@@ -70,7 +65,7 @@ int test_conf(char *err_msg) {
         }
 
         /* validate readconf(...) result */
-        if (readconf("./validate/test.conf")) {
+        if (readconf("./test.conf")) {
                 strcpy(err_msg, "'readconf' function failed");
                 return -1;
         }
