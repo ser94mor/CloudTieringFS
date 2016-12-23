@@ -5,7 +5,7 @@
 
 ### versions
 MAJOR_VER ::= 0
-MINOR_VER ::= 1
+MINOR_VER ::= 2
 PATCH_VER ::= 0
 VERSION   ::= ${MAJOR_VER}.${MINOR_VER}.${PATCH_VER}
 
