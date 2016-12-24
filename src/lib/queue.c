@@ -6,20 +6,25 @@
 
 #include "cloudtiering.h"
 
-
 /**
- * @brief queue_empty Indicates that queue is empty.
- * @return >0 if size equals 0; 0 if size greater then 0; -1 if queue equals NULL
+ * @brief queue_empty Indicates that the queue is empty.
+ * @note This function is thread-safe.
+ * @param[in] queue Queue to check for emptiness.
+ * @return  1: queue size is zero
+ *          0: queue size is greater than zero
+ *         -1: queue pointer equals NULL
  */
 int queue_empty(queue_t *queue) {
+        /* check input parameter's correctness */
         if (queue == NULL) {
                 return -1;
         }
 
+        /* check internal queue state under lock for thread safety */
         pthread_mutex_lock(&queue->mutex);
 
-        /* ensure that positive non-zero value will be returned if queue is empty */
-        int ret = !!(queue->cur_q_size == 0);
+        /* ensure that value of 1 will be returned if queue is empty */
+        int ret = !!(queue->cur_size == 0);
 
         pthread_mutex_unlock(&queue->mutex);
 
@@ -29,32 +34,46 @@ int queue_empty(queue_t *queue) {
 
 /**
  * @brief queue_full Indicates that the queue is full.
- * @return >0 if size equals maximem queue size therwise 0; -1 if queue equals NULL
+ * @note This function is thread-safe.
+ * @param[in] queue Queue to check for fullness.
+ * @return  1: queue size reached its maximum
+ *          0: queue size is less than its maximum
+ *         -1: queue pointer equals NULL
  */
 int queue_full(queue_t *queue) {
+        /* check input parameter's correctness */
         if (queue == NULL) {
                 return -1;
         }
 
+        /* check internal queue state under lock for thread safety */
         pthread_mutex_lock(&queue->mutex);
 
-        int ret = !!(queue->cur_q_size == queue->max_q_size);
+        /* ensure that value of 1 will be returned if queue is full */
+        int ret = !!(queue->cur_size == queue->max_size);
 
         pthread_mutex_unlock(&queue->mutex);
 
         return ret;
 }
 
+
 /**
- * This function does not check input parameters and should be used only under locked mutex.
+ * @brief queue_contains Checks the presence of element in the queue.
+ * @note This function is not thread-safe.
+ * @note This function does not check correctness of input parameters.
+ * @return 1 if size equals maximum queue size therwise 0; -1 if queue equals NULL
  */
-static int queue_contains(queue_t *queue, char *item, size_t item_size) {
+static int queue_contains(queue_t *queue, const char *item, size_t item_size) {
+        /* pointer to the currently considered element of queue */
         char *q_ptr = queue->head;
-        size_t sz = queue->cur_q_size;
+
+        /* number of unconsidered queue elements */
+        size_t sz = queue->cur_size;
 
         while (sz != 0) {
-                if (q_ptr == (queue->buffer + queue->buffer_size)) {
-                        q_ptr = queue->buffer;
+                if (q_ptr == (queue->buf + queue->buf_size)) {
+                        q_ptr = queue->buf;
                 }
 
                 if ((*((size_t *)q_ptr) == item_size) &&
@@ -62,7 +81,7 @@ static int queue_contains(queue_t *queue, char *item, size_t item_size) {
                         return 1; /* true */
                 }
 
-                q_ptr += sizeof(size_t) + queue->max_item_size;
+                q_ptr += sizeof(size_t) + queue->elem_size;
                 --sz;
         }
 
@@ -73,15 +92,15 @@ static int queue_contains(queue_t *queue, char *item, size_t item_size) {
  * @brief queue_push Push item into queue if there is enough place for this item.
  * @return 0 on sussess; -1 on failure
  */
-int queue_push(queue_t *queue, char *item, size_t item_size) {
+int queue_push(queue_t *queue, const char *item, size_t item_size) {
         if (queue == NULL || item == NULL || item_size == 0 ||
-            item_size > queue->max_item_size) {
+            item_size > queue->elem_size) {
                 return -1;
         }
 
         pthread_mutex_lock(&queue->mutex);
 
-        if (queue->cur_q_size == queue->max_q_size) {
+        if (queue->cur_size == queue->max_size) {
                 pthread_mutex_unlock(&queue->mutex);
                 return -1;
         }
@@ -91,14 +110,14 @@ int queue_push(queue_t *queue, char *item, size_t item_size) {
                 return -1;
         }
 
-        char *ptr = (queue->tail == (queue->buffer + queue->buffer_size)) ?
-                                       queue->buffer : queue->tail;
+        char *ptr = (queue->tail == (queue->buf + queue->buf_size)) ?
+                                       queue->buf : queue->tail;
 
         memcpy(ptr, (char *)&item_size, sizeof(size_t));
         memcpy(ptr + sizeof(size_t), item, item_size);
 
-        queue->tail = (char *)(ptr + sizeof(size_t) + queue->max_item_size);
-        queue->cur_q_size++;
+        queue->tail = (char *)(ptr + sizeof(size_t) + queue->elem_size);
+        queue->cur_size++;
 
         pthread_mutex_unlock(&queue->mutex);
 
@@ -117,16 +136,16 @@ int queue_pop(queue_t *queue) {
 
         pthread_mutex_lock(&queue->mutex);
 
-        if (queue->cur_q_size == 0) {
+        if (queue->cur_size == 0) {
                 pthread_mutex_unlock(&queue->mutex);
                 return -1;
         }
 
         queue->head =
-        (queue->head == (queue->buffer + queue->buffer_size - queue->max_item_size - sizeof(size_t))) ?
-                          queue->buffer :
-                          queue->head + queue->max_item_size + sizeof(size_t);
-        queue->cur_q_size--;
+        (queue->head == (queue->buf + queue->buf_size - queue->elem_size - sizeof(size_t))) ?
+                          queue->buf :
+                          queue->head + queue->elem_size + sizeof(size_t);
+        queue->cur_size--;
 
         pthread_mutex_unlock(&queue->mutex);
 
@@ -144,7 +163,7 @@ char *queue_front(queue_t *queue, size_t *size) {
 
         pthread_mutex_lock(&queue->mutex);
 
-        if (queue->cur_q_size == 0) {
+        if (queue->cur_size == 0) {
                 pthread_mutex_unlock(&queue->mutex);
                 return NULL;
         }
@@ -170,19 +189,18 @@ queue_t *queue_alloc(size_t max_q_size, size_t max_item_size) {
         }
 
         /* initialize structure members */
-        queue->buffer_size = (sizeof(size_t) + max_item_size) * max_q_size;
-        queue->buffer = malloc(queue->buffer_size);
-        if (queue->buffer == NULL) {
+        queue->buf_size = (sizeof(size_t) + max_item_size) * max_q_size;
+        queue->buf = malloc(queue->buf_size);
+        if (queue->buf == NULL) {
                 free(queue);
                 return NULL;
         }
-        queue->max_q_size = max_q_size;
-        queue->cur_q_size = 0;
-        queue->max_item_size = max_item_size;
-        queue->head = queue->buffer;
-        queue->tail = queue->buffer;
+        queue->max_size = max_q_size;
+        queue->cur_size = 0;
+        queue->elem_size = max_item_size;
+        queue->head = queue->buf;
+        queue->tail = queue->buf;
 
-        /* NOTE: may be it is safer to use pthread_mutex_create */
         queue->mutex = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
 
         return queue;
@@ -193,12 +211,10 @@ queue_t *queue_alloc(size_t max_q_size, size_t max_item_size) {
  * @brief queue_free Frees all memory allocated for the given queue.
  */
 void queue_free(queue_t *queue) {
-    if (queue == NULL) {
-        return;
-    }
+        if (queue == NULL) {
+                return;
+        }
 
-    /* TODO: check for NULL */
-    /* NOTE: cleanup mutex??? */
-    free(queue->buffer);
-    free(queue);
+        free(queue->buf);
+        free(queue);
 }

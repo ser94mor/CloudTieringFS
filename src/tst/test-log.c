@@ -1,6 +1,7 @@
 #include <string.h>
 #include <signal.h>
 #include <setjmp.h>
+#include <stdio.h>
 
 #include "cloudtiering.h"
 

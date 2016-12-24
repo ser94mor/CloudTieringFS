@@ -9,27 +9,28 @@
 
 #include "cloudtiering.h"
 
-static const char *test_conf_str = "<General>\n"                             \
-                                   "    FsMountPoint             /foo/bar\n" \
-                                   "    LoggingFramework         default\n"  \
-                                   "    RemoteStoreProtocol      s3\n"       \
-                                   "</General>\n"                            \
-                                   "<Internal>\n"                            \
-                                   "    ScanfsIterTimeoutSec     100\n"      \
-                                   "    ScanfsMaximumFailures    1\n"        \
-                                   "    MoveFileMaximumFailures  2\n"        \
-                                   "    MoveOutStartRate         0.8\n"      \
-                                   "    MoveOutStopRate          0.7\n"      \
-                                   "    OutQueueMaxSize          9999\n"     \
-                                   "    InQueueMaxSize           1111\n"     \
-                                   "</Internal>\n"                           \
-                                   "<S3RemoteStore>\n"                       \
-                                   "    S3DefaultHostname        s3_hostname\n"        \
-                                   "    S3Bucket                 s3.bucket\n"          \
-                                   "    S3AccessKeyId            test_access_key_id\n" \
-                                   "    S3SecretAccessKey        test_secret_key\n"    \
-                                   "    TransferProtocol         https\n"              \
-                                   "</S3RemoteStore>\n";
+static const char *test_conf_str = \
+        "<General>\n"                                       \
+        "    FsMountPoint             /foo/bar\n"           \
+        "    LoggingFramework         simple\n"             \
+        "    RemoteStoreProtocol      s3\n"                 \
+        "</General>\n"                                      \
+        "<Internal>\n"                                      \
+        "    ScanfsIterTimeoutSec     100\n"                \
+        "    ScanfsMaximumFailures    1\n"                  \
+        "    MoveFileMaximumFailures  2\n"                  \
+        "    MoveOutStartRate         0.8\n"                \
+        "    MoveOutStopRate          0.7\n"                \
+        "    OutQueueMaxSize          9999\n"               \
+        "    InQueueMaxSize           1111\n"               \
+        "</Internal>\n"                                     \
+        "<S3RemoteStore>\n"                                 \
+        "    S3DefaultHostname        s3_hostname\n"        \
+        "    S3Bucket                 s3.bucket\n"          \
+        "    S3AccessKeyId            test_access_key_id\n" \
+        "    S3SecretAccessKey        test_secret_key\n"    \
+        "    TransferProtocol         https\n"              \
+        "</S3RemoteStore>\n";
 
 static int create_test_conf_file() {
         /* create configuration file */
@@ -71,6 +72,8 @@ int test_conf(char *err_msg) {
         }
 
         conf = getconf();
+        log_t *log = get_log();
+
         if (strcmp(conf->fs_mount_point, "/foo/bar") ||
             strcmp(conf->s3_default_hostname, "s3_hostname") ||
             strcmp(conf->s3_bucket, "s3.bucket") ||
@@ -85,7 +88,7 @@ int test_conf(char *err_msg) {
             conf->move_out_stop_rate != 0.7 ||
             conf->out_q_max_size != 9999 ||
             conf->in_q_max_size != 1111 ||
-            strncmp(conf->logger.name, "default", sizeof(conf->logger.name))
+            log->type != e_simple
         ) {
                 strcpy(err_msg, "configuratition contains incorrect values");
                 return -1;

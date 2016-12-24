@@ -2,6 +2,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <time.h>
+#include <stdio.h>
 #include <pthread.h>
 
 #include "cloudtiering.h"

@@ -2,6 +2,7 @@
 #define _XOPEN_SOURCE 500    /* needed to use nftw() */
 
 #include <string.h>
+#include <stdio.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <pthread.h>

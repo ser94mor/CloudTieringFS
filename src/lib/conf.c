@@ -14,6 +14,7 @@
 #include "ops.h"
 
 static conf_t *conf = NULL;
+static log_t  *log  = NULL;
 
 static DOTCONF_CB(fs_mount_point);
 static DOTCONF_CB(scanfs_iter_tm_sec);
@@ -66,35 +67,25 @@ static const char *protocol_str[] = {
 };
 
 
-/*
- * Supported logger framework definitions.
- */
-#define DECL_LOGGER(log_kind) \
-        static log_t log_kind##_logger = { \
-                .name      = #log_kind, \
-                .open_log  = log_kind##_open_log, \
-                .log       = log_kind##_log, \
-                .close_log = log_kind##_close_log, \
-                .error     = log_kind##_ERROR, \
-                .info      = log_kind##_INFO, \
-                .debug     = log_kind##_DEBUG \
-        };
+/*******************************************************************************
+* Logging frameworks' definitions.                                             *
+*******************************************************************************/
 
-/* unfortunately there is a name conflict with syslog.h definitions; use prefix '_' */
-#define FOREACH_LOGGER(action) \
-        action(_syslog) \
-        action(_default)
+/* declaration of structures for each type of supported logging framework */
+LOGGERS(DECLARE_LOGGER, SEMICOLON);
 
-FOREACH_LOGGER(DECL_LOGGER);
-
-/* following enum values are indexes to string repserentations */
-enum logger_enum {
-        FOREACH_LOGGER(GENERATE_ENUM)
+/* string names of logging frameworks */
+static const char *log_type_str[] = {
+        LOGGERS(STRINGIFY, COMMA),
 };
 
-static const char *logger_str[] = {
-        FOREACH_LOGGER(GENERATE_STR_ARRAY)
+/* array of pointers to logging frameworks' structures */
+static log_t *log_arr[] = {
+        LOGGERS(LOGGER_ADDR, COMMA),
 };
+
+/* number of supported logging frameworks */
+static const size_t log_count = LOGGERS(MAP_TO_ONE, PLUS);
 
 
 /*
@@ -199,19 +190,14 @@ static DOTCONF_CB(in_q_max_size) {
 }
 
 static DOTCONF_CB(logger) {
-        /* use '+ 1' to get rid of '_' prefix */
-        if (strcmp(cmd->data.str, logger_str[_syslog] + 1) == 0) {
-                conf->logger = _syslog_logger;
-        } else if (strcmp(cmd->data.str, logger_str[_default] + 1) == 0) {
-                conf->logger = _default_logger;
-        } else {
-                return "unsupported logger framework";
+        for (int i = 0; i < log_count; i++) {
+                if (strcmp(cmd->data.str, log_type_str[i]) == 0) {
+                        log = log_arr[i];
+                        return NULL;
+                }
         }
 
-        /* get rid of '_' prefix in logger.name */
-        strcpy(conf->logger.name, conf->logger.name + 1);
-
-        return NULL;
+        return "unsupported logging framework";
 }
 
 static DOTCONF_CB(remote_store_protocol) {
@@ -252,10 +238,20 @@ static DOTCONF_CB(s3_secret_access_key) {
 
 /**
  * @brief getconf Get pointer to configuration.
- * @return Pointer to conf_t or NULL if readconf has not been invoked yet.
+ * @return Pointer to conf_t or NULL if readconf has not been
+ *         invoked yet or failed.
  */
 inline conf_t *getconf() {
         return conf;
+}
+
+/**
+ * @brief get_log Get pointer to logging framework.
+ * @return Pointer to log_t or NULL if readconf has not been
+ *         invoked yet or failed.
+ */
+inline log_t *get_log() {
+        return log;
 }
 
 /**

@@ -4,26 +4,33 @@
 /**
  * SYSLOG
  */
+
+/* inclusion is needed for syslog's logging levels and functions' signatures */
 #include <syslog.h>
 
-#define _syslog_ERROR    LOG_ERR
-#define _syslog_INFO     LOG_INFO
-#define _syslog_DEBUG    LOG_DEBUG
+/* logging levels */
+#define syslog_ERROR    LOG_ERR
+#define syslog_INFO     LOG_INFO
+#define syslog_DEBUG    LOG_DEBUG
 
-void _syslog_open_log(const char *name);
-void _syslog_log(int level, const char *msg_fmt, ...);
-void _syslog_close_log(void);
+/* logging functions */
+void syslog_open_log(const char *name);
+#define syslog_log         syslog
+#define syslog_close_log   closelog
 
 
 /**
- * DEFAULT
+ * SIMPLE
  */
-#define     _default_ERROR    0
-#define     _default_INFO     3
-#define     _default_DEBUG    5
 
-void _default_open_log(const char *name);
-void _default_log(int level, const char *msg_fmt, ...);
-void _default_close_log(void);
+/* logging levels */
+#define simple_ERROR    0
+#define simple_INFO     3
+#define simple_DEBUG    5
+
+/* logging functions */
+void simple_open_log(const char *name);
+void simple_log(int level, const char *msg_fmt, ...);
+void simple_close_log(void);
 
 #endif /* LOG_H */

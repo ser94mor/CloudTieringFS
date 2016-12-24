@@ -2,52 +2,145 @@
 #define CLOUDTIERING_H
 
 
-/*
- * LOG
- */
+/* general macroses useful for definitions and declarations */
+#define COMMA              ,
+#define SEMICOLON          ;
+#define EMPTY
+#define PLUS               +
 
+#define ENUMERIZE(elem)      e_##elem
+#define STRINGIFY(elem)      #elem
+#define MAP_TO_ONE(elem)     1
+#define CONCAT(elem1, elem2) elem1##elem2
+
+
+/*******************************************************************************
+* LOGGING                                                                      *
+* -------                                                                      *
+*                                                                              *
+* Framework-agnostic logging facility. Type definitions, function signatures'  *
+* declarations and macroses that provide a user with short, concise and        *
+* convenient logging tackle.                                                   *
+*                                                                              *
+* Usage:                                                                       *
+*     OPEN_LOG("program_name");                                                *
+*     ...                                                                      *
+*     LOG(ERROR, "failure: %s", err_msg);                                      *
+*     LOG(INFO,  "connection established successfully");                       *
+*     LOG(ERROR, "counter value: %d", cnt_val);                                *
+*     ...                                                                      *
+*     CLOSE_LOG();                                                             *
+*                                                                              *
+* Notes:                                                                       *
+*     - LOG() expands to function which is uaranteed to be thread-safe.        *
+*     - Thread-safeness of OPEN_LOG() and CLOSE_LOG() expansions is not        *
+*       guaranteed and depends on an actual logging framework implementation.  *
+*******************************************************************************/
+
+/* suffix for variable name of specific logging framework */
+#define LOG_VAR_SUFFIX    _logger
+
+/* macros that is useful for initialization of specific logging frameworks */
+#define DECLARE_LOGGER(elem)                           \
+                static log_t elem##LOG_VAR_SUFFIX = {  \
+                        .type      = e_##elem,         \
+                        .open_log  = elem##_open_log,  \
+                        .log       = elem##_log,       \
+                        .close_log = elem##_close_log, \
+                        .error     = elem##_ERROR,     \
+                        .info      = elem##_INFO,      \
+                        .debug     = elem##_DEBUG      \
+                }
+
+/* macro to get an address of a variable name of specific logging framework */
+#define LOGGER_ADDR(elem)    &elem##LOG_VAR_SUFFIX
+
+/* macros which defines a list of supported logging frameworks
+   and allows to declare enums, arrays and perform variables' declarations */
+#define LOGGERS(action, sep)   \
+            action(syslog) sep \
+            action(simple)
+
+/* enum of supported logging frameworks */
+enum log_e {
+        LOGGERS(ENUMERIZE, COMMA)
+};
+
+/* definition of framework-agnostic logger */
 typedef struct {
-        char name[256];                         /* human-readable name of logging framework */
-        void (*open_log)(const char *);         /* calls open log function from logger framework */
-        void (*log)(int, const char *, ...);    /* calls log function from logger framework */
-        void (*close_log)(void);                /* calls close log fucntion from logger framework */
-        int  error;                             /* integer representing ERROR level in logging framework */
-        int  info;                              /* integer representing INFO level in logging framework */
-        int  debug;                             /* integer representing DEBUG level in logging framework */
+        /* logging framework type */
+        enum log_e type;
+
+        /* framework-agnostic logging initializer */
+        void (*open_log)(const char *);
+
+        /* framework-agnostic logging function */
+        void (*log)(int, const char *, ...);
+
+        /* framework-agnostic logging destructor */
+        void (*close_log)(void);
+
+        /* number representing error message logging level */
+        int  error;
+
+        /* number representing info message logging level */
+        int  info;
+
+        /* number representing debug message logging level */
+        int  debug;
 } log_t;
 
-#define ERROR      (getconf()->logger.error)
-#define INFO       (getconf()->logger.info)
-#define DEBUG      (getconf()->logger.debug)
+/* concise macroses representing different logging levels */
+#define ERROR      (get_log()->error)
+#define INFO       (get_log()->info)
+#define DEBUG      (get_log()->debug)
 
-#define OPEN_LOG(name)            (getconf()->logger.open_log(name))
-#define LOG(level,format,args...) (getconf()->logger.log(level, format, ## args))
-#define CLOSE_LOG()               (getconf()->logger.close_log())
+/* concise macroses representing logging functions' calls */
+#define OPEN_LOG(name)            (get_log()->open_log(name))
+#define LOG(level,format,args...) (get_log()->log(level, format, ## args))
+#define CLOSE_LOG()               (get_log()->close_log())
 
 
-/*
- * QUEUE
- */
+/*******************************************************************************
+* QUEUE                                                                        *
+* -----                                                                        *
+*******************************************************************************/
 
-#include <stdio.h>
-#include <pthread.h>
-#include <sys/types.h>
+/* inclusions of third-parties */
+#include <pthread.h>      /* included for pthread_mutex_t type definition */
+#include <sys/types.h>    /* included for size_t type definition */
 
+/* definition of queue data-structure */
 typedef struct {
+        /* pointer to the front element of queue */
         char  *head;
+
+        /* pointer to the back element of queue  */
         char  *tail;
-        size_t cur_q_size;
-        size_t max_q_size;
-        size_t max_item_size;
-        char  *buffer;
-        size_t buffer_size;
+
+        /* current queue size */
+        size_t cur_size;
+
+        /* maximum queue size */
+        size_t max_size;
+
+        /* element size (fixed) */
+        size_t elem_size;
+
+        /* pointer to buffer where elements stored */
+        char  *buf;
+
+        /* size in byte of buffer where elements stored */
+        size_t buf_size;
+
+        /* mutex to ensure thread-safety property */
         pthread_mutex_t mutex;
 } queue_t;
 
 int queue_empty(queue_t *q);
 int queue_full(queue_t *q);
 
-int queue_push(queue_t *q, char *item, size_t item_size);
+int queue_push(queue_t *q, const char *item, size_t item_size);
 int queue_pop(queue_t *q);
 
 char *queue_front(queue_t *q, size_t *size);
@@ -89,7 +182,6 @@ typedef struct {
         size_t out_q_max_size;                /* maximum size of out queue */
         size_t in_q_max_size;                 /* maximum size of in queue */
         size_t path_max;                      /* maximum path length in fs_mount_point directory can not be lower than this value */
-        log_t  logger;                        /* implementation neutral logger */
         ops_t  ops;                           /* operation (depends on remote store protocol) */
 
         /* 63 it is unlikely that protocol identifies require more symbols */
@@ -113,6 +205,7 @@ typedef struct {
 
 int readconf(const char *conf_path);
 conf_t *getconf();
+log_t  *get_log();
 
 
 /*

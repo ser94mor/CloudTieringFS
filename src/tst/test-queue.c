@@ -25,7 +25,7 @@ static int queue_print(FILE *stream, queue_t *queue) {
 
         char *q_ptr = queue->head;
 
-        char buf[queue->max_item_size + 1];
+        char buf[queue->elem_size + 1];
 
         /* header */
         fprintf(stream, "QUEUE:\n");
@@ -35,19 +35,19 @@ static int queue_print(FILE *stream, queue_t *queue) {
                         "\t< max. queue size : %zu >\n"\
                         "\t< max. item  size : %zu >\n"\
                         "\t< queue buf. size : %zu >\n",
-                queue->cur_q_size, queue->max_q_size,
-                queue->max_item_size, queue->buffer_size);
+                queue->cur_size, queue->max_size,
+                queue->elem_size, queue->buf_size);
 
         /* data */
-        size_t sz = queue->cur_q_size;
+        size_t sz = queue->cur_size;
         while (sz != 0) {
-                if (q_ptr == (queue->buffer + queue->buffer_size)) {
-                        q_ptr = queue->buffer;
+                if (q_ptr == (queue->buf + queue->buf_size)) {
+                        q_ptr = queue->buf;
                 }
                 memcpy(buf, q_ptr + sizeof(size_t), (size_t)(*q_ptr));
                 buf[(size_t)(*q_ptr)] = '\0';
                 fprintf(stream, "\t|--> %zu %s \n", (size_t)(*q_ptr), buf);
-                q_ptr += sizeof(size_t) + queue->max_item_size;
+                q_ptr += sizeof(size_t) + queue->elem_size;
                 --sz;
         }
 

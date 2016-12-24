@@ -11,10 +11,11 @@ VERSION   ::= ${MAJOR_VER}.${MINOR_VER}.${PATCH_VER}
 
 
 ### names
-APP_NAME   ::= cloudtiering-monitor
-LIB_SONAME ::= libcloudtiering.so
+NAME       ::= cloudtiering
+APP_NAME   ::= ${NAME}-daemon
+LIB_SONAME ::= lib${NAME}.so
 LIB_NAME   ::= ${LIB_SONAME}.${VERSION}
-TST_NAME   ::= cloudtiering-test
+TST_NAME   ::= ${NAME}-test
 
 
 ### directories
