@@ -59,19 +59,19 @@ int test_conf(char *err_msg) {
                 return -1;
         }
 
-        conf_t *conf = getconf(); /* should be NULL before readconf call */
+        conf_t *conf = get_conf(); /* should be NULL before read_conf() call */
         if (conf != NULL) {
-                strcpy(err_msg, "'getconf' should return NULL before 'readconf' was ever invoked");
+                strcpy(err_msg, "'get_conf()' should return NULL before 'read_conf()' was ever invoked");
                 return -1;
         }
 
-        /* validate readconf(...) result */
-        if (readconf("./test.conf")) {
-                strcpy(err_msg, "'readconf' function failed");
+        /* validate read_conf() result */
+        if (read_conf("./test.conf")) {
+                strcpy(err_msg, "'read_conf()' function failed");
                 return -1;
         }
 
-        conf = getconf();
+        conf = get_conf();
         log_t *log = get_log();
 
         if (strcmp(conf->fs_mount_point, "/foo/bar") ||

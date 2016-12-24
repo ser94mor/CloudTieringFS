@@ -15,6 +15,7 @@
 
 static conf_t *conf = NULL;
 static log_t  *log  = NULL;
+static ops_t  *ops  = NULL;
 
 static DOTCONF_CB(fs_mount_point);
 static DOTCONF_CB(scanfs_iter_tm_sec);
@@ -237,21 +238,30 @@ static DOTCONF_CB(s3_secret_access_key) {
 }
 
 /**
- * @brief getconf Get pointer to configuration.
- * @return Pointer to conf_t or NULL if readconf has not been
+ * @brief get_conf Get pointer to configuration.
+ * @return Pointer to conf_t or NULL if read_conf() has not been
  *         invoked yet or failed.
  */
-inline conf_t *getconf() {
+inline conf_t *get_conf() {
         return conf;
 }
 
 /**
  * @brief get_log Get pointer to logging framework.
- * @return Pointer to log_t or NULL if readconf has not been
+ * @return Pointer to log_t or NULL if read_conf() has not been
  *         invoked yet or failed.
  */
 inline log_t *get_log() {
         return log;
+}
+
+/**
+ * @brief get_ops Get pointer to operatons data-structure.
+ * @return Pointer to ops_t or NULL if read_conf() has not been
+ *         invoked yet or failed.
+ */
+inline ops_t *get_ops() {
+        return ops;
 }
 
 /**
@@ -274,13 +284,13 @@ static int init_dependent_members(void) {
 }
 
 /**
- * @brief readconf Read configuration from file.
+ * @brief read_conf Read configuration from file.
  * @note Does not handle the case when line length exceeded LINE_MAX limit.
  * @note Does not handle the case when file contains duplicate keys.
  * @param[in] conf_path Path to a configuration file. If NULL then use default configuration.
  * @return 0 on success, -1 on failure.
  */
-int readconf(const char *conf_path) {
+int read_conf(const char *conf_path) {
         if (conf != NULL) {
                 return -1;
         }

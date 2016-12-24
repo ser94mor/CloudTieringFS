@@ -17,7 +17,7 @@ static void monitor_threads(pthread_t *scanfs_thread,
 
 static void *move_file_routine(void *args) {
         queue_t *queue = (queue_t *)args;
-        conf_t  *conf = getconf();
+        conf_t  *conf = get_conf();
 
         int move_file_fails = 0;
         for (;;) {
@@ -41,7 +41,7 @@ static void *scanfs_routine(void *args) {
         queue_t **in_out_q = (queue_t **)args;
         queue_t *in_queue  = in_out_q[0];
         queue_t *out_queue = in_out_q[1];
-        conf_t *conf = getconf();
+        conf_t *conf = get_conf();
 
         int scanfs_fails = 0;
         for (;;) {
@@ -62,10 +62,10 @@ static void *scanfs_routine(void *args) {
 }
 
 static int init_data(queue_t **in_out_queue) {
-        conf_t *conf = getconf();
+        conf_t *conf = get_conf();
         if (conf == NULL) {
                 /* impossible because readconf() executed successfully */
-                LOG(ERROR, "getconf() unexpectedly returned NULL; unable to start");
+                LOG(ERROR, "get_conf() unexpectedly returned NULL; unable to start");
                 return -1;
         }
 
@@ -139,7 +139,7 @@ int main(int argc, char *argv[]) {
         }
 
         /* read configuration file specified via input argument */
-        if (readconf(argv[1])) {
+        if (read_conf(argv[1])) {
                 fprintf(stderr, "failed to read configuration file %s", argv[1]);
                 return EXIT_FAILURE;
         }

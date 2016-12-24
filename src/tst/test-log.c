@@ -17,8 +17,8 @@ static void sigsegv_handler(int signo) {
 int test_log(char *err_msg) {
         /* this test should be execute after test_conf where
            conf_t and log_t structures will be initialized */
-        if (getconf() == NULL) {
-                strcpy(err_msg, "configuration was not initialized (getconf() returned NULL)");
+        if (get_conf() == NULL) {
+                strcpy(err_msg, "configuration was not initialized (get_conf() returned NULL)");
                 return -1;
         }
 

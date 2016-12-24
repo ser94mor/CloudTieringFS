@@ -25,7 +25,7 @@ static int queue_print(FILE *stream, queue_t *queue) {
 
         char *q_ptr = queue->head;
 
-        char buf[queue->elem_size + 1];
+        char buf[queue->elem_max_size + 1];
 
         /* header */
         fprintf(stream, "QUEUE:\n");
@@ -36,7 +36,7 @@ static int queue_print(FILE *stream, queue_t *queue) {
                         "\t< max. item  size : %zu >\n"\
                         "\t< queue buf. size : %zu >\n",
                 queue->cur_size, queue->max_size,
-                queue->elem_size, queue->buf_size);
+                queue->elem_max_size, queue->buf_size);
 
         /* data */
         size_t sz = queue->cur_size;
@@ -47,7 +47,7 @@ static int queue_print(FILE *stream, queue_t *queue) {
                 memcpy(buf, q_ptr + sizeof(size_t), (size_t)(*q_ptr));
                 buf[(size_t)(*q_ptr)] = '\0';
                 fprintf(stream, "\t|--> %zu %s \n", (size_t)(*q_ptr), buf);
-                q_ptr += sizeof(size_t) + queue->elem_size;
+                q_ptr += sizeof(size_t) + queue->elem_max_size;
                 --sz;
         }
 
@@ -101,7 +101,7 @@ int test_queue(char *err_msg) {
 
         for (int j = 0; j < QUEUE_MAX_SIZE - 1; j++) {
                 size_t it_sz = 0;
-                char *it = queue_front(queue, &it_sz);
+                const char *it = queue_front(queue, &it_sz);
 
                 if (strcmp(item[j], it) || it_sz != (strlen(item[j]) + 1)) {
                         strcpy(err_msg, "'queue_front' failed; wrong return result");
@@ -143,7 +143,7 @@ int test_queue(char *err_msg) {
 
         for (i = 0; i < QUEUE_MAX_SIZE - 1; i++) {
                 size_t it_sz = 0;
-                char *it = queue_front(queue, &it_sz);
+                const char *it = queue_front(queue, &it_sz);
 
                 if (strcmp(item[j], it) || it_sz != (strlen(item[j]) + 1)) {
                         strcpy(err_msg, "'queue_front' failed; wrong return result");

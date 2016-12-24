@@ -177,7 +177,7 @@ int move_file(queue_t *queue) {
         if (!queue_empty(queue)) {
                 /* get front element in the queue */
                 size_t it_sz = 0;
-                char *path = queue_front(queue, &it_sz);
+                const char *path = queue_front(queue, &it_sz);
                 if (path == NULL) {
                         strcpy(err_buf, "failed to get front element of queue");
                         goto err;
@@ -193,7 +193,7 @@ int move_file(queue_t *queue) {
                         local_flag = 1;
 
                         /* local files should be moved out */
-                        if (getconf()->ops.move_file_out(path) == -1) {
+                        if (get_conf()->ops.move_file_out(path) == -1) {
                                 sprintf(err_buf, "failed to move file %s out", path);
                                 goto err;
                         }
@@ -201,7 +201,7 @@ int move_file(queue_t *queue) {
                         local_flag = 0;
 
                         /* remote files should be moved in */
-                        if (getconf()->ops.move_file_in(path) == -1) {
+                        if (get_conf()->ops.move_file_in(path) == -1) {
                                 sprintf(err_buf, "failed to move file %s in", path);
                                 goto err;
                         }
@@ -297,7 +297,7 @@ static S3ResponseHandler g_response_handler = {
 };
 
 static void s3_init_globals(void) {
-        conf_t *conf = getconf();
+        conf_t *conf = get_conf();
 
         S3Protocol transfer_protocol = strcmp(conf->transfer_protocol, "http") == 0 ?
                                               S3ProtocolHTTP : S3ProtocolHTTPS;
@@ -464,7 +464,7 @@ static int s3_put_object(const char *path) {
 }
 
 int s3_init_remote_store_access(void) {
-        conf_t *conf = getconf();
+        conf_t *conf = get_conf();
 
         S3Status status = S3_initialize(NULL, S3_INIT_ALL, conf->s3_default_hostname);
 
@@ -636,7 +636,7 @@ static int update_evict_queue(const char *fpath, const struct stat *sb,  int typ
 }
 
 int scanfs(queue_t *in_q, queue_t *out_q) {
-        conf_t *conf = getconf();
+        conf_t *conf = get_conf();
 
         in_queue  = in_q;
         out_queue = out_q;

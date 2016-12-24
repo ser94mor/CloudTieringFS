@@ -3,15 +3,12 @@
 
 
 /* general macroses useful for definitions and declarations */
-#define COMMA              ,
-#define SEMICOLON          ;
-#define EMPTY
-#define PLUS               +
-
+#define COMMA                ,
+#define SEMICOLON            ;
+#define PLUS                 +
 #define ENUMERIZE(elem)      e_##elem
 #define STRINGIFY(elem)      #elem
 #define MAP_TO_ONE(elem)     1
-#define CONCAT(elem1, elem2) elem1##elem2
 
 
 /*******************************************************************************
@@ -124,8 +121,8 @@ typedef struct {
         /* maximum queue size */
         size_t max_size;
 
-        /* element size (fixed) */
-        size_t elem_size;
+        /* element maximum size */
+        size_t elem_max_size;
 
         /* pointer to buffer where elements stored */
         char  *buf;
@@ -137,16 +134,16 @@ typedef struct {
         pthread_mutex_t mutex;
 } queue_t;
 
-int queue_empty(queue_t *q);
-int queue_full(queue_t *q);
+int queue_empty(queue_t *queue);
+int queue_full(queue_t *queue);
 
-int queue_push(queue_t *q, const char *item, size_t item_size);
-int queue_pop(queue_t *q);
+int queue_push(queue_t *queue, const char *item, size_t item_size);
+int queue_pop(queue_t *queue);
 
-char *queue_front(queue_t *q, size_t *size);
+const char *queue_front(queue_t *queue, size_t *size);
 
-queue_t *queue_alloc(size_t max_q_size, size_t max_item_size);
-void queue_free(queue_t *q);
+queue_t *queue_alloc(size_t max_size, size_t elem_size);
+void queue_free(queue_t *queue);
 
 
 /*
@@ -203,9 +200,10 @@ typedef struct {
         char   s3_secret_access_key[128];     /* s3 secret access key */
 } conf_t;
 
-int readconf(const char *conf_path);
-conf_t *getconf();
+int read_conf(const char *conf_path);
+conf_t *get_conf();
 log_t  *get_log();
+ops_t  *get_ops();
 
 
 /*
@@ -215,4 +213,3 @@ log_t  *get_log();
 int scanfs(queue_t *in_q, queue_t *out_q);
 
 #endif /* CLOUDTIERING_H */
-

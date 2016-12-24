@@ -6,10 +6,14 @@
 
 #include "cloudtiering.h"
 
+
 /**
  * @brief queue_empty Indicates that the queue is empty.
+ *
  * @note This function is thread-safe.
+ *
  * @param[in] queue Queue to check for emptiness.
+ *
  * @return  1: queue size is zero
  *          0: queue size is greater than zero
  *         -1: queue pointer equals NULL
@@ -34,8 +38,11 @@ int queue_empty(queue_t *queue) {
 
 /**
  * @brief queue_full Indicates that the queue is full.
+ *
  * @note This function is thread-safe.
+ *
  * @param[in] queue Queue to check for fullness.
+ *
  * @return  1: queue size reached its maximum
  *          0: queue size is less than its maximum
  *         -1: queue pointer equals NULL
@@ -60,11 +67,19 @@ int queue_full(queue_t *queue) {
 
 /**
  * @brief queue_contains Checks the presence of element in the queue.
+ *
  * @note This function is not thread-safe.
  * @note This function does not check correctness of input parameters.
- * @return 1 if size equals maximum queue size therwise 0; -1 if queue equals NULL
+ *
+ * @param[in] queue     Queue where an attempt to find an element
+ *                      will be performed.
+ * @param[in] elem      Element which is a target of searching.
+ * @param[in] elem_size Element's size in bytes.
+ *
+ * @return  1: if element found in queue
+ *         -1: if element not found in queue
  */
-static int queue_contains(queue_t *queue, const char *item, size_t item_size) {
+static int queue_contains(queue_t *queue, const char *elem, size_t elem_size) {
         /* pointer to the currently considered element of queue */
         char *q_ptr = queue->head;
 
@@ -76,12 +91,12 @@ static int queue_contains(queue_t *queue, const char *item, size_t item_size) {
                         q_ptr = queue->buf;
                 }
 
-                if ((*((size_t *)q_ptr) == item_size) &&
-                    memcmp(q_ptr + sizeof(size_t), item, item_size)) {
+                if ((*((size_t *)q_ptr) == elem_size) &&
+                    memcmp(q_ptr + sizeof(size_t), elem, elem_size)) {
                         return 1; /* true */
                 }
 
-                q_ptr += sizeof(size_t) + queue->elem_size;
+                q_ptr += sizeof(size_t) + queue->elem_max_size;
                 --sz;
         }
 
@@ -94,7 +109,7 @@ static int queue_contains(queue_t *queue, const char *item, size_t item_size) {
  */
 int queue_push(queue_t *queue, const char *item, size_t item_size) {
         if (queue == NULL || item == NULL || item_size == 0 ||
-            item_size > queue->elem_size) {
+            item_size > queue->elem_max_size) {
                 return -1;
         }
 
@@ -116,7 +131,7 @@ int queue_push(queue_t *queue, const char *item, size_t item_size) {
         memcpy(ptr, (char *)&item_size, sizeof(size_t));
         memcpy(ptr + sizeof(size_t), item, item_size);
 
-        queue->tail = (char *)(ptr + sizeof(size_t) + queue->elem_size);
+        queue->tail = (char *)(ptr + sizeof(size_t) + queue->elem_max_size);
         queue->cur_size++;
 
         pthread_mutex_unlock(&queue->mutex);
@@ -142,9 +157,9 @@ int queue_pop(queue_t *queue) {
         }
 
         queue->head =
-        (queue->head == (queue->buf + queue->buf_size - queue->elem_size - sizeof(size_t))) ?
+        (queue->head == (queue->buf + queue->buf_size - queue->elem_max_size - sizeof(size_t))) ?
                           queue->buf :
-                          queue->head + queue->elem_size + sizeof(size_t);
+                          queue->head + queue->elem_max_size + sizeof(size_t);
         queue->cur_size--;
 
         pthread_mutex_unlock(&queue->mutex);
@@ -156,7 +171,7 @@ int queue_pop(queue_t *queue) {
  * @brief queue_front Returns pointer to head queue element and updates size of element varaible.
  * @return Pointer to head queue element or NULL if there are no elements.
  */
-char *queue_front(queue_t *queue, size_t *size) {
+const char *queue_front(queue_t *queue, size_t *size) {
         if (queue == NULL || size == NULL) {
                 return NULL;
         }
@@ -197,7 +212,7 @@ queue_t *queue_alloc(size_t max_q_size, size_t max_item_size) {
         }
         queue->max_size = max_q_size;
         queue->cur_size = 0;
-        queue->elem_size = max_item_size;
+        queue->elem_max_size = max_item_size;
         queue->head = queue->buf;
         queue->tail = queue->buf;
 
