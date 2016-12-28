@@ -192,9 +192,18 @@ static int is_valid_path(const char *path) {
  */
 int move_file(queue_t *queue) {
         if (!queue_empty(queue)) {
-                /* get front element in the queue */
+                /* double queue_front invocation does not lead to violation of
+                   thread-safeness since given queue has only one consumer
+                   (this thread) */
+
+                /* get item size of front element */
                 size_t it_sz = 0;
-                const char *path = queue_front(queue, &it_sz);
+                queue_front(queue, NULL, &it_sz);
+
+                /* get front element of the queue */
+                char path[it_sz];
+                queue_front(queue, path, &it_sz);
+
                 if (path == NULL) {
                         strcpy(err_buf, "failed to get front element of queue");
                         goto err;

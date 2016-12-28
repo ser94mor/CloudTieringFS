@@ -25,26 +25,129 @@
 
 
 /**
- * @brief queue_empty Indicates that the queue is empty.
+ * @brief queue_bytes_per_elem Returns a number of bytes consumed by
+ *                             one queue's element.
+ *
+ * @note This function is thread-safe.
+ * @note This function does not check a correctness of input parameters.
+ *
+ * @param[in] queue A queue whose bytes-per-element value will be calculated.
+ *
+ * @return a number of bytes required to store one element in a queue
+ */
+static inline size_t queue_bytes_per_elem(const queue_t *queue) {
+        return (sizeof(size_t) + queue->data_max_size);
+}
+
+
+/**
+ * @brief queue_buf_end Returns a pointer to queue's buffer end.
+ *
+ * @note This function is thread-safe.
+ * @note This function does not check a correctness of input parameters.
+ *
+ * @param[in] queue A queue whose end of buffer pointer will be returned.
+ *
+ * @return a pointer to an end of queue's buffer
+ */
+static inline const char *queue_buf_end(const queue_t *queue) {
+        return (queue->buf + queue->buf_size);
+}
+
+
+/**
+ * @brief queue_elem_size Returns a size in bytes of a given element of a queue.
+ *
+ * @note This function in not thread-safe.
+ * @note This function does not check a correctness of input parameters.
+ *
+ * @param[in] elem A pointer to an element's space in a queue's buffer.
+ *
+ * @return size of a data of a given element
+ */
+static inline size_t queue_elem_size(const char *elem) {
+        return (*((size_t *)elem));
+}
+
+
+/**
+ * @brief queue_elem_data A pointer to an element's data.
+ *
+ * @note This function in not thread-safe.
+ * @note This function does not check a correctness of input parameters.
+ *
+ * @param[in] elem A pointer to an element's space in a queue's buffer.
+ *
+ * @return a pointer to an element's data
+ */
+static inline char *queue_elem_data(const char *elem) {
+        return ((char *)elem + sizeof(size_t));
+}
+
+
+/**
+ * @brief queue_contains Checks a presence of a given data in a queue.
+ *
+ * @note This function is not thread-safe.
+ * @note This function does not check a correctness of input parameters.
+ *
+ * @param[in] queue     A queue where an attempt to find an element
+ *                      will be performed.
+ * @param[in] data      A data which is a target of searching.
+ * @param[in] data_size A data's size in bytes.
+ *
+ * @return  1: if a data found in a queue
+ *         -1: if a data not found in a queue
+ */
+static int queue_contains(queue_t *queue, const char *data, size_t data_size) {
+        /* a pointer to a currently considered element of a queue */
+        char *q_ptr = queue->head;
+
+        /* a number of unconsidered queue's elements */
+        size_t sz = queue->cur_size;
+
+        while (sz != 0) {
+                /* a begining and an end of a buffer are logically identical */
+                if (q_ptr == queue_buf_end(queue)) {
+                        q_ptr = (char *)queue->buf;
+                }
+
+                /* found if an element's data equals to a given data */
+                if ((queue_elem_size(q_ptr) == data_size) &&
+                        memcmp(queue_elem_data(q_ptr), data, data_size)) {
+                        return 1; /* true */
+                        }
+
+                        /* go to a next element */
+                        q_ptr += queue_bytes_per_elem(queue);
+                --sz;
+        }
+
+        return 0; /* false */
+}
+
+
+/**
+ * @brief queue_empty Indicates that a queue is empty.
  *
  * @note This function is thread-safe.
  *
- * @param[in] queue Queue to check for emptiness.
+ * @param[in] queue A queue to check for emptiness.
  *
- * @return  1: queue size is zero
- *          0: queue size is greater than zero
- *         -1: queue pointer equals NULL
+ * @return  1: a queue's size is zero
+ *          0: a queue's size is greater than zero
+ *         -1: a queue's pointer equals NULL
  */
 int queue_empty(queue_t *queue) {
-        /* check input parameter's correctness */
+        /* check an input parameter's correctness */
         if (queue == NULL) {
                 return -1;
         }
 
-        /* check internal queue state under lock for thread safety */
+        /* check an internal queue's state under a lock for thread-safety */
         pthread_mutex_lock(&queue->mutex);
 
-        /* ensure that value of 1 will be returned if queue is empty */
+        /* ensure that a value of 1 will be returned if a queue is empty */
         int ret = !!(queue->cur_size == 0);
 
         pthread_mutex_unlock(&queue->mutex);
@@ -54,26 +157,26 @@ int queue_empty(queue_t *queue) {
 
 
 /**
- * @brief queue_full Indicates that the queue is full.
+ * @brief queue_full Indicates that a queue is full.
  *
  * @note This function is thread-safe.
  *
- * @param[in] queue Queue to check for fullness.
+ * @param[in] queue A queue to check for fullness.
  *
- * @return  1: queue size reached its maximum
- *          0: queue size is less than its maximum
- *         -1: queue pointer equals NULL
+ * @return  1: a queue's size reached its maximum
+ *          0: a queue's size is less than its maximum
+ *         -1: a queue's pointer equals NULL
  */
 int queue_full(queue_t *queue) {
-        /* check input parameter's correctness */
+        /* check an input parameter's correctness */
         if (queue == NULL) {
                 return -1;
         }
 
-        /* check internal queue state under lock for thread safety */
+        /* check an internal queue's state under a lock for thread-safety */
         pthread_mutex_lock(&queue->mutex);
 
-        /* ensure that value of 1 will be returned if queue is full */
+        /* ensure that a value of 1 will be returned if a queue is full */
         int ret = !!(queue->cur_size == queue->max_size);
 
         pthread_mutex_unlock(&queue->mutex);
@@ -83,72 +186,50 @@ int queue_full(queue_t *queue) {
 
 
 /**
- * @brief queue_contains Checks the presence of element in the queue.
+ * @brief queue_push Pushes an element into a queue if the queue is not full.
  *
- * @note This function is not thread-safe.
- * @note This function does not check correctness of input parameters.
+ * @note This function is thread-safe.
  *
- * @param[in] queue     Queue where an attempt to find an element
- *                      will be performed.
- * @param[in] elem      Element which is a target of searching.
- * @param[in] elem_size Element's size in bytes.
+ * @param[in,out] queue     The queue into which a new element will be pushed.
+ * @param[in]     data      A provided data.
+ * @param[in]     data_size A size of the provided data.
  *
- * @return  1: if element found in queue
- *         -1: if element not found in queue
+ * @return  0: the element pushed successfully into the queue
+ *         -1: incorrect input parameters provided or the queue is full
  */
-static int queue_contains(queue_t *queue, const char *elem, size_t elem_size) {
-        /* pointer to the currently considered element of queue */
-        char *q_ptr = queue->head;
-
-        /* number of unconsidered queue elements */
-        size_t sz = queue->cur_size;
-
-        while (sz != 0) {
-                if (q_ptr == (queue->buf + queue->buf_size)) {
-                        q_ptr = queue->buf;
-                }
-
-                if ((*((size_t *)q_ptr) == elem_size) &&
-                    memcmp(q_ptr + sizeof(size_t), elem, elem_size)) {
-                        return 1; /* true */
-                }
-
-                q_ptr += sizeof(size_t) + queue->elem_max_size;
-                --sz;
-        }
-
-        return 0; /* false */
-}
-
-/**
- * @brief queue_push Push item into queue if there is enough place for this item.
- * @return 0 on sussess; -1 on failure
- */
-int queue_push(queue_t *queue, const char *item, size_t item_size) {
-        if (queue == NULL || item == NULL || item_size == 0 ||
-            item_size > queue->elem_max_size) {
+int queue_push(queue_t *queue, const char *data, size_t data_size) {
+        /* check an input parameters' correctness */
+        if (queue == NULL || data == NULL || data_size == 0 ||
+            data_size > queue->data_max_size) {
                 return -1;
         }
 
+        /* modify an internal queue's state under a lock for thread-safety */
         pthread_mutex_lock(&queue->mutex);
 
+        /* fail if the queue is full */
         if (queue->cur_size == queue->max_size) {
                 pthread_mutex_unlock(&queue->mutex);
                 return -1;
         }
 
-        if (queue_contains(queue, item, item_size)) {
+        /* fail if the data is already presented in the queue */
+        if (queue_contains(queue, data, data_size)) {
                 pthread_mutex_unlock(&queue->mutex);
                 return -1;
         }
 
-        char *ptr = (queue->tail == (queue->buf + queue->buf_size)) ?
-                                       queue->buf : queue->tail;
+        /* a begining and an end of a buffer are logically identical */
+        char *ptr = (queue->tail == queue_buf_end(queue)) ?
+                                (char *)queue->buf : (char *)queue->tail;
 
-        memcpy(ptr, (char *)&item_size, sizeof(size_t));
-        memcpy(ptr + sizeof(size_t), item, item_size);
+        /* fill an element's space in buffer with a size of the data
+           and the data itself */
+        memcpy(ptr, (char *)&data_size, sizeof(size_t));
+        memcpy(queue_elem_data(ptr), data, data_size);
 
-        queue->tail = (char *)(ptr + sizeof(size_t) + queue->elem_max_size);
+        /* update the queue's internal state */
+        queue->tail = (char *)(ptr + queue_bytes_per_elem(queue));
         queue->cur_size++;
 
         pthread_mutex_unlock(&queue->mutex);
@@ -158,25 +239,36 @@ int queue_push(queue_t *queue, const char *item, size_t item_size) {
 
 
 /**
- * @brief queue_pop Pop item from queue if queue is not empty.
- * @return 0 it item was popped; -1 if queue is NULL or queue is empty
+ * @brief queue_pop Pops an element from a queue if the queue is not empty.
+ *
+ * @note This function is thread-safe.
+ *
+ * @param[in,out] queue The queue from where the head's element will be popped.
+ *
+ * @return  0: the element was popped successfully
+ *         -1: incorrect input parameters provided or the queue is empty
  */
 int queue_pop(queue_t *queue) {
+        /* check an input parameter's correctness */
         if (queue == NULL) {
                 return -1;
         }
 
+        /* modify an internal queue's state under a lock for thread-safety */
         pthread_mutex_lock(&queue->mutex);
 
+        /* fail if there is nothing to pop */
         if (queue->cur_size == 0) {
                 pthread_mutex_unlock(&queue->mutex);
                 return -1;
         }
 
-        queue->head =
-        (queue->head == (queue->buf + queue->buf_size - queue->elem_max_size - sizeof(size_t))) ?
-                          queue->buf :
-                          queue->head + queue->elem_max_size + sizeof(size_t);
+        /* a begining and an end of a buffer are logically identical;
+           update the queue's internal state */
+        queue->head = (queue->head ==
+                       (queue_buf_end(queue) - queue_bytes_per_elem(queue))) ?
+                           (char *)queue->buf :
+                           (char *)queue->head + queue_bytes_per_elem(queue);
         queue->cur_size--;
 
         pthread_mutex_unlock(&queue->mutex);
@@ -184,54 +276,86 @@ int queue_pop(queue_t *queue) {
         return 0;
 }
 
+
 /**
- * @brief queue_front Returns pointer to head queue element and updates size of element varaible.
- * @return Pointer to head queue element or NULL if there are no elements.
+ * @brief queue_front Fills provided buffers for a data and a data's size
+ *                    with front queue element's values. Can be used with
+ *                    a NULL data pointer to obtain only the size of the front
+ *                    queue's element.
+ *
+ * @note This function is thread-safe.
+ *
+ * @param[in]  queue     The queue whose front element will be processed.
+ * @param[out] data      Pointer to a buffer of an appropriate size or NULL.
+ * @param[out] data_size Pointer to a buffer where the data's size
+ *                       will be written.
+ *
+ * @return  0: the data_size parameter set and, if not NULL,
+ *             a data buffer filled
+ *         -1: incorrect input parameters provided or the queue is empty
  */
-const char *queue_front(queue_t *queue, size_t *size) {
-        if (queue == NULL || size == NULL) {
-                return NULL;
+int queue_front(queue_t *queue, char *data, size_t *data_size) {
+        /* check an input parameters' correctness; a data can be NULL */
+        if (queue == NULL || data_size == NULL) {
+                return -1;
         }
 
+        /* access an internal queue's state under a lock for thread-safety */
         pthread_mutex_lock(&queue->mutex);
 
+        /* fail if the queue is empty */
         if (queue->cur_size == 0) {
                 pthread_mutex_unlock(&queue->mutex);
-                return NULL;
+                return -1;
         }
 
-        *size = (size_t)(*queue->head);
-        char *ret = queue->head + sizeof(size_t);
+        /* set a value of the data's size */
+        *data_size = queue_elem_size(queue->head);
+
+        /* set data only in case a buffer for data provided */
+        if (data != NULL) {
+                memcpy(data, queue_elem_data(queue->head), *data_size);
+        }
 
         pthread_mutex_unlock(&queue->mutex);
 
-        return ret;
+        return 0;
 }
 
 
 /**
- * @brief queue_alloc Allocates memory for a queue and initializes max_q_size with the given value.
+ * @brief queue_alloc Allocates memory for a queue_t data structure and
+ *                    initializes its members.
+ *
+ * @note This function is thread-safe.
+ *
+ * @param[in] max_size      A maximum number of elements in a queue.
+ * @param[in] data_max_size A maximum size of a data allowed to be pushed
+ *                          into the queue.
+ *
  * @return Pointer to initialized queue_t.
  */
-queue_t *queue_alloc(size_t max_q_size, size_t max_item_size) {
-        /* allocate memory for queue_t data structure */
+queue_t *queue_alloc(size_t max_size, size_t data_max_size) {
+        /* allocate a memory for a queue_t data structure */
         queue_t *queue = malloc(sizeof(queue_t));
         if (queue == NULL) {
                 return NULL;
         }
 
         /* initialize structure members */
-        queue->buf_size = (sizeof(size_t) + max_item_size) * max_q_size;
+        queue->max_size = max_size;
+        queue->cur_size = 0;
+        queue->data_max_size = data_max_size;
+
+        queue->buf_size = (sizeof(size_t) + data_max_size) * max_size;
         queue->buf = malloc(queue->buf_size);
         if (queue->buf == NULL) {
                 free(queue);
                 return NULL;
         }
-        queue->max_size = max_q_size;
-        queue->cur_size = 0;
-        queue->elem_max_size = max_item_size;
-        queue->head = queue->buf;
-        queue->tail = queue->buf;
+
+        queue->head = (char *)queue->buf;
+        queue->tail = (char *)queue->buf;
 
         queue->mutex = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
 
@@ -240,13 +364,17 @@ queue_t *queue_alloc(size_t max_q_size, size_t max_item_size) {
 
 
 /**
- * @brief queue_free Frees all memory allocated for the given queue.
+ * @brief queue_free Frees all memory allocated for a given queue.
+ *
+ * @note This function is not thread-safe.
+ *
+ * @param[out] queue Pointer to a queue's structure to be freed.
  */
 void queue_free(queue_t *queue) {
         if (queue == NULL) {
                 return;
         }
 
-        free(queue->buf);
+        free((char *)queue->buf);
         free(queue);
 }

@@ -121,45 +121,45 @@ typedef struct {
 *******************************************************************************/
 
 /* inclusions of third-parties */
-#include <pthread.h>      /* included for pthread_mutex_t type definition */
-#include <sys/types.h>    /* included for size_t type definition */
+#include <pthread.h>      /* included for a pthread_mutex_t type definition */
+#include <sys/types.h>    /* included for a size_t type definition */
 
-/* definition of queue data-structure */
+/* a definition of a queue data-structure */
 typedef struct {
-        /* pointer to the front element of queue */
+        /* a pointer to the front element of a queue */
         char  *head;
 
-        /* pointer to the back element of queue  */
+        /* a pointer to a back element of a queue */
         char  *tail;
 
-        /* current queue size */
+        /* a current queue's size */
         size_t cur_size;
 
-        /* maximum queue size */
+        /* a maximum queue's size */
         size_t max_size;
 
-        /* element maximum size */
-        size_t elem_max_size;
+        /* a data's maximum size */
+        size_t data_max_size;
 
-        /* pointer to buffer where elements stored */
-        char  *buf;
+        /* a pointer to a buffer where elements are stored */
+        const char  *buf;
 
-        /* size in byte of buffer where elements stored */
+        /* a size in byte of a buffer where elements are stored */
         size_t buf_size;
 
-        /* mutex to ensure thread-safety property */
+        /* a mutex to ensure a thread-safety property */
         pthread_mutex_t mutex;
 } queue_t;
 
 int queue_empty(queue_t *queue);
 int queue_full(queue_t *queue);
 
-int queue_push(queue_t *queue, const char *item, size_t item_size);
+int queue_push(queue_t *queue, const char *data, size_t data_size);
 int queue_pop(queue_t *queue);
 
-const char *queue_front(queue_t *queue, size_t *size);
+int queue_front(queue_t *queue, char *data, size_t *data_size);
 
-queue_t *queue_alloc(size_t max_size, size_t elem_size);
+queue_t *queue_alloc(size_t queue_max_size, size_t data_max_size);
 void queue_free(queue_t *queue);
 
 

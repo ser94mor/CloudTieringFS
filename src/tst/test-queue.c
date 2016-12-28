@@ -42,7 +42,7 @@ static int queue_print(FILE *stream, queue_t *queue) {
 
         char *q_ptr = queue->head;
 
-        char buf[queue->elem_max_size + 1];
+        char buf[queue->data_max_size + 1];
 
         /* header */
         fprintf(stream, "QUEUE:\n");
@@ -53,18 +53,18 @@ static int queue_print(FILE *stream, queue_t *queue) {
                         "\t< max. item  size : %zu >\n"\
                         "\t< queue buf. size : %zu >\n",
                 queue->cur_size, queue->max_size,
-                queue->elem_max_size, queue->buf_size);
+                queue->data_max_size, queue->buf_size);
 
         /* data */
         size_t sz = queue->cur_size;
         while (sz != 0) {
                 if (q_ptr == (queue->buf + queue->buf_size)) {
-                        q_ptr = queue->buf;
+                        q_ptr = (char *)queue->buf;
                 }
                 memcpy(buf, q_ptr + sizeof(size_t), (size_t)(*q_ptr));
                 buf[(size_t)(*q_ptr)] = '\0';
                 fprintf(stream, "\t|--> %zu %s \n", (size_t)(*q_ptr), buf);
-                q_ptr += sizeof(size_t) + queue->elem_max_size;
+                q_ptr += sizeof(size_t) + queue->data_max_size;
                 --sz;
         }
 
@@ -117,8 +117,11 @@ int test_queue(char *err_msg) {
         }
 
         for (int j = 0; j < QUEUE_MAX_SIZE - 1; j++) {
+                /* NOTE: following queue_front usege is not thread safe */
                 size_t it_sz = 0;
-                const char *it = queue_front(queue, &it_sz);
+                queue_front(queue, NULL, &it_sz);
+                char it[it_sz];
+                queue_front(queue, it, &it_sz);
 
                 if (strcmp(item[j], it) || it_sz != (strlen(item[j]) + 1)) {
                         strcpy(err_msg, "'queue_front' failed; wrong return result");
@@ -159,8 +162,11 @@ int test_queue(char *err_msg) {
         }
 
         for (i = 0; i < QUEUE_MAX_SIZE - 1; i++) {
+                /* NOTE: following queue_front usege is not thread safe */
                 size_t it_sz = 0;
-                const char *it = queue_front(queue, &it_sz);
+                queue_front(queue, NULL, &it_sz);
+                char it[it_sz];
+                queue_front(queue, it, &it_sz);
 
                 if (strcmp(item[j], it) || it_sz != (strlen(item[j]) + 1)) {
                         strcpy(err_msg, "'queue_front' failed; wrong return result");
