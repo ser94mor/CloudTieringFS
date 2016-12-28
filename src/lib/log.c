@@ -30,6 +30,7 @@
 
 /**
  * @brief syslog_open_log Implementation of open_log() function using syslog.
+ *
  * @param[in] name A string prepended to every message (usually a program name).
  */
 void syslog_open_log(const char *name) {
@@ -56,6 +57,7 @@ static const char *simple_process_name = "unknown";
 
 /**
  * @brief simple_open_log Simple implementation of open_log() function.
+ *
  * @param[in] name A string prepended to every message (usually a program name).
  */
 void simple_open_log(const char *name) {
@@ -90,6 +92,7 @@ void simple_open_log(const char *name) {
 
 /**
  * @brief simple_log Simple implementation of log() function.
+ *
  * @param[in] level   A logging level.
  * @param[in] msg_fmt A message string, possibly with specifiers.
  * @param[in] ...     Values to be substitures to msg_fmt string.
