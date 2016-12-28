@@ -118,13 +118,14 @@ typedef struct {
 /*******************************************************************************
 * QUEUE                                                                        *
 * -----                                                                        *
+* TODO: write description                                                      *
 *******************************************************************************/
 
 /* inclusions of third-parties */
 #include <pthread.h>      /* included for a pthread_mutex_t type definition */
 #include <sys/types.h>    /* included for a size_t type definition */
 
-/* a definition of a queue data-structure */
+/* a definition of a queue data structure */
 typedef struct {
         /* a pointer to the front element of a queue */
         char  *head;
@@ -151,16 +152,14 @@ typedef struct {
         pthread_mutex_t mutex;
 } queue_t;
 
-int queue_empty(queue_t *queue);
-int queue_full(queue_t *queue);
-
-int queue_push(queue_t *queue, const char *data, size_t data_size);
-int queue_pop(queue_t *queue);
-
-int queue_front(queue_t *queue, char *data, size_t *data_size);
-
+/* functions to work with queue data structure */
 queue_t *queue_alloc(size_t queue_max_size, size_t data_max_size);
 void queue_free(queue_t *queue);
+int queue_empty(queue_t *queue);
+int queue_full(queue_t *queue);
+int queue_push(queue_t *queue, const char *data, size_t data_size);
+int queue_pop(queue_t *queue);
+int queue_front(queue_t *queue, char *data, size_t *data_size);
 
 
 /*
