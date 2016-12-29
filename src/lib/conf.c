@@ -34,56 +34,6 @@ static conf_t *conf = NULL;
 static log_t  *log  = NULL;
 static ops_t  *ops  = NULL;
 
-static DOTCONF_CB(fs_mount_point);
-static DOTCONF_CB(scanfs_iter_tm_sec);
-static DOTCONF_CB(scanfs_max_fails);
-static DOTCONF_CB(move_file_max_fails);
-static DOTCONF_CB(move_out_start_rate);
-static DOTCONF_CB(move_out_stop_rate);
-static DOTCONF_CB(out_q_max_size);
-static DOTCONF_CB(in_q_max_size);
-static DOTCONF_CB(logger);
-static DOTCONF_CB(s3_default_hostname);
-static DOTCONF_CB(s3_bucket);
-static DOTCONF_CB(s3_access_key_id);
-static DOTCONF_CB(s3_secret_access_key);
-static DOTCONF_CB(remote_store_protocol);
-static DOTCONF_CB(transfer_protocol);
-
-
-/*
- * Common macroses.
- */
-#define GENERATE_ENUM(item) item,
-
-#define GENERATE_STR_ARRAY(item) #item,
-
-
-/*
- * Supported remote store protocol definitions.
- */
-#define DECL_PROTOCOL_OPS(protocol) \
-        static ops_t protocol##_ops = { \
-                .init_remote_store_access = protocol##_init_remote_store_access, \
-                .move_file_in             = protocol##_move_file_in, \
-                .move_file_out            = protocol##_move_file_out, \
-                .term_remote_store_access = protocol##_term_remote_store_access \
-        };
-
-#define FOREACH_PROTOCOL(action) \
-        action(s3)
-
-FOREACH_PROTOCOL(DECL_PROTOCOL_OPS);
-
-/* following enum values are indexes to string repserentations */
-enum protocol_enum {
-        FOREACH_PROTOCOL(GENERATE_ENUM)
-};
-
-static const char *protocol_str[] = {
-        FOREACH_PROTOCOL(GENERATE_STR_ARRAY)
-};
-
 
 /*******************************************************************************
 * Logging frameworks' definitions.                                             *
@@ -93,7 +43,7 @@ static const char *protocol_str[] = {
 LOGGERS(DECLARE_LOGGER, SEMICOLON);
 
 /* string names of logging frameworks */
-static const char *log_type_str[] = {
+static const char *log_str[] = {
         LOGGERS(STRINGIFY, COMMA),
 };
 
@@ -106,110 +56,85 @@ static log_t *log_arr[] = {
 static const size_t log_count = LOGGERS(MAP_TO_ONE, PLUS);
 
 
-/*
- * Section definitions.
- */
-/* CTX_ALL expand to 0, that is why '__COUNTER__ + 1' value is used below */
-#define DECL_SECT(name) \
-        static const char beg_##name##_sect[] = "<"  #name ">", \
-                          end_##name##_sect[] = "</" #name ">"; \
-        static DOTCONF_CB(open_##name##_sect) { \
-                return NULL; \
-        } \
-        static DOTCONF_CB(close_##name##_sect) { \
-                return NULL; \
+/*******************************************************************************
+* Sections' definitions.                                                       *
+*******************************************************************************/
+
+/* declaration of each section's begining and end token strings */
+SECTIONS(DECLARE_SECTION, SEMICOLON);
+
+/* a macro-function that declares dotconf's begining and end section
+   callback functions */
+#define DECLARE_SECTION_CALLBACKS(elem)              \
+        static DOTCONF_CB(cb_beg_##elem##_section) { \
+                return NULL;                         \
+        }                                            \
+        static DOTCONF_CB(cb_end_##elem##_section) { \
+                return NULL;                         \
         }
 
-#define GENERATE_ENUM_CUSTOM(item) ctx_##item = __COUNTER__ + 1,
 
-#define FOREACH_SECT(action) \
-        action(General) \
-        action(Internal) \
-        action(S3RemoteStore)
+/*******************************************************************************
+* Operations' definitions.                                                      *
+*******************************************************************************/
 
-FOREACH_SECT(DECL_SECT);
-
-enum sect_enum {
-        FOREACH_SECT(GENERATE_ENUM_CUSTOM)
+/* string names of supported object storage protocols */
+static const char *protocol_str[] = {
+        PROTOCOLS(STRINGIFY, COMMA),
 };
 
+/* declaration of ops_t data-structure for each kind of protocol */
+PROTOCOLS(DECLARE_OPS, SEMICOLON);
 
-/*
- * Option definitions.
- */
-static const configoption_t options[] = {
-        /* General section */
-        { beg_General_sect,          ARG_NONE,   open_General_sect,        NULL, CTX_ALL          },
-        { "FsMountPoint",            ARG_STR,    fs_mount_point,           NULL, ctx_General      },
-        { "LoggingFramework",        ARG_STR,    logger,                   NULL, ctx_General      },
-        { "RemoteStoreProtocol",     ARG_STR,    remote_store_protocol,    NULL, ctx_General      },
-        { end_General_sect,          ARG_NONE,   close_General_sect,       NULL, CTX_ALL          },
+/*******************************************************************************
+* Dotconf callback functions' definitions.                                     *
+*******************************************************************************/
 
-        /* Internal section */
-        { beg_Internal_sect,         ARG_NONE,   open_Internal_sect,       NULL, CTX_ALL           },
-        { "ScanfsIterTimeoutSec",    ARG_INT,    scanfs_iter_tm_sec,       NULL, ctx_Internal      },
-        { "ScanfsMaximumFailures",   ARG_INT,    scanfs_max_fails,         NULL, ctx_Internal      },
-        { "MoveFileMaximumFailures", ARG_INT,    move_file_max_fails,      NULL, ctx_Internal      },
-        { "MoveOutStartRate",        ARG_DOUBLE, move_out_start_rate,      NULL, ctx_Internal      },
-        { "MoveOutStopRate",         ARG_DOUBLE, move_out_stop_rate,       NULL, ctx_Internal      },
-        { "OutQueueMaxSize",         ARG_INT,    out_q_max_size,           NULL, ctx_Internal      },
-        { "InQueueMaxSize",          ARG_INT,    in_q_max_size,            NULL, ctx_Internal      },
-        { end_Internal_sect,         ARG_NONE,   close_Internal_sect,      NULL, CTX_ALL           },
+SECTIONS(DECLARE_SECTION_CALLBACKS, EMPTY)
 
-        /* S3RemoteStore section */
-        { beg_S3RemoteStore_sect,    ARG_NONE,   open_S3RemoteStore_sect,  NULL, CTX_ALL           },
-        { "S3DefaultHostname",       ARG_STR,    s3_default_hostname,      NULL, ctx_S3RemoteStore },
-        { "S3Bucket",                ARG_STR,    s3_bucket,                NULL, ctx_S3RemoteStore },
-        { "S3AccessKeyId",           ARG_STR,    s3_access_key_id,         NULL, ctx_S3RemoteStore },
-        { "S3SecretAccessKey",       ARG_STR,    s3_secret_access_key,     NULL, ctx_S3RemoteStore },
-        { "TransferProtocol",        ARG_STR,    transfer_protocol,        NULL, ctx_S3RemoteStore },
-        { end_S3RemoteStore_sect,    ARG_NONE,   close_S3RemoteStore_sect, NULL, CTX_ALL           },
-        LAST_OPTION
-};
-
-static DOTCONF_CB(fs_mount_point) {
+static DOTCONF_CB(cb_fs_mount_point) {
         strcpy(conf->fs_mount_point, cmd->data.str);
         return NULL;
 }
 
-static DOTCONF_CB(scanfs_iter_tm_sec) {
+static DOTCONF_CB(cb_scanfs_iter_tm_sec) {
         conf->scanfs_iter_tm_sec = (time_t)cmd->data.value;
         return NULL;
 }
 
-static DOTCONF_CB(scanfs_max_fails) {
+static DOTCONF_CB(cb_scanfs_max_fails) {
         conf->scanfs_max_fails = (int)cmd->data.value;
         return NULL;
 }
 
-static DOTCONF_CB(move_file_max_fails) {
+static DOTCONF_CB(cb_move_file_max_fails) {
         conf->move_file_max_fails = (int)cmd->data.value;
         return NULL;
 }
 
-static DOTCONF_CB(move_out_start_rate) {
+static DOTCONF_CB(cb_move_out_start_rate) {
         conf->move_out_start_rate = (double)cmd->data.dvalue;
         return NULL;
 }
 
-static DOTCONF_CB(move_out_stop_rate) {
+static DOTCONF_CB(cb_move_out_stop_rate) {
         conf->move_out_stop_rate = (double)cmd->data.dvalue;
         return NULL;
 }
 
-static DOTCONF_CB(out_q_max_size) {
+static DOTCONF_CB(cb_out_q_max_size) {
         conf->out_q_max_size = (size_t)cmd->data.value;
         return NULL;
 }
 
-static DOTCONF_CB(in_q_max_size) {
+static DOTCONF_CB(cb_in_q_max_size) {
         conf->in_q_max_size = (size_t)cmd->data.value;
         return NULL;
 }
 
-static DOTCONF_CB(logger) {
+static DOTCONF_CB(cb_logger) {
         for (int i = 0; i < log_count; i++) {
-                if (strcmp(cmd->data.str, log_type_str[i]) == 0) {
+                if (strcmp(cmd->data.str, log_str[i]) == 0) {
                         log = log_arr[i];
                         return NULL;
                 }
@@ -218,8 +143,8 @@ static DOTCONF_CB(logger) {
         return "unsupported logging framework";
 }
 
-static DOTCONF_CB(remote_store_protocol) {
-        if (strcmp(cmd->data.str, protocol_str[s3]) == 0) {
+static DOTCONF_CB(cb_remote_store_protocol) {
+        if (strcmp(cmd->data.str, protocol_str[e_s3]) == 0) {
                 conf->ops = s3_ops;
                 strcpy(conf->remote_store_protocol, cmd->data.str);
         } else {
@@ -229,30 +154,63 @@ static DOTCONF_CB(remote_store_protocol) {
         return NULL;
 }
 
-static DOTCONF_CB(transfer_protocol) {
+static DOTCONF_CB(cb_transfer_protocol) {
         strcpy(conf->transfer_protocol, cmd->data.str);
         return NULL;
 }
 
-static DOTCONF_CB(s3_default_hostname) {
+static DOTCONF_CB(cb_s3_default_hostname) {
         strcpy(conf->s3_default_hostname, cmd->data.str);
         return NULL;
 }
 
-static DOTCONF_CB(s3_bucket) {
+static DOTCONF_CB(cb_s3_bucket) {
         strcpy(conf->s3_bucket, cmd->data.str);
         return NULL;
 }
 
-static DOTCONF_CB(s3_access_key_id) {
+static DOTCONF_CB(cb_s3_access_key_id) {
         strcpy(conf->s3_access_key_id, cmd->data.str);
         return NULL;
 }
 
-static DOTCONF_CB(s3_secret_access_key) {
+static DOTCONF_CB(cb_s3_secret_access_key) {
         strcpy(conf->s3_secret_access_key, cmd->data.str);
         return NULL;
 }
+
+/*
+ * Option definitions.
+ */
+static const configoption_t options[] = {
+        /* General section */
+        { beg_General_sect,          ARG_NONE,   cb_beg_General_section,       NULL, CTX_ALL          },
+        { "FsMountPoint",            ARG_STR,    cb_fs_mount_point,            NULL, ctx_General      },
+        { "LoggingFramework",        ARG_STR,    cb_logger,                    NULL, ctx_General      },
+        { "RemoteStoreProtocol",     ARG_STR,    cb_remote_store_protocol,     NULL, ctx_General      },
+        { end_General_sect,          ARG_NONE,   cb_end_General_section,       NULL, CTX_ALL          },
+
+        /* Internal section */
+        { beg_Internal_sect,         ARG_NONE,   cb_beg_Internal_section,      NULL, CTX_ALL           },
+        { "ScanfsIterTimeoutSec",    ARG_INT,    cb_scanfs_iter_tm_sec,        NULL, ctx_Internal      },
+        { "ScanfsMaximumFailures",   ARG_INT,    cb_scanfs_max_fails,          NULL, ctx_Internal      },
+        { "MoveFileMaximumFailures", ARG_INT,    cb_move_file_max_fails,       NULL, ctx_Internal      },
+        { "MoveOutStartRate",        ARG_DOUBLE, cb_move_out_start_rate,       NULL, ctx_Internal      },
+        { "MoveOutStopRate",         ARG_DOUBLE, cb_move_out_stop_rate,        NULL, ctx_Internal      },
+        { "OutQueueMaxSize",         ARG_INT,    cb_out_q_max_size,            NULL, ctx_Internal      },
+        { "InQueueMaxSize",          ARG_INT,    cb_in_q_max_size,             NULL, ctx_Internal      },
+        { end_Internal_sect,         ARG_NONE,   cb_end_Internal_section,      NULL, CTX_ALL           },
+
+        /* S3RemoteStore section */
+        { beg_S3RemoteStore_sect,    ARG_NONE,   cb_beg_S3RemoteStore_section, NULL, CTX_ALL           },
+        { "S3DefaultHostname",       ARG_STR,    cb_s3_default_hostname,       NULL, ctx_S3RemoteStore },
+        { "S3Bucket",                ARG_STR,    cb_s3_bucket,                 NULL, ctx_S3RemoteStore },
+        { "S3AccessKeyId",           ARG_STR,    cb_s3_access_key_id,          NULL, ctx_S3RemoteStore },
+        { "S3SecretAccessKey",       ARG_STR,    cb_s3_secret_access_key,      NULL, ctx_S3RemoteStore },
+        { "TransferProtocol",        ARG_STR,    cb_transfer_protocol,         NULL, ctx_S3RemoteStore },
+        { end_S3RemoteStore_sect,    ARG_NONE,   cb_end_S3RemoteStore_section, NULL, CTX_ALL           },
+        LAST_OPTION
+};
 
 /**
  * @brief get_conf Get pointer to configuration.
