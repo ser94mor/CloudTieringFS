@@ -86,6 +86,7 @@ static const char *protocol_str[] = {
 /* declaration of ops_t data-structure for each kind of protocol */
 PROTOCOLS(DECLARE_OPS, SEMICOLON);
 
+
 /*******************************************************************************
 * Dotconf callback functions' definitions.                                     *
 *******************************************************************************/
@@ -179,9 +180,10 @@ static DOTCONF_CB(s3_secret_access_key_cb) {
         return NULL;
 }
 
-/*
- * Option definitions.
- */
+
+/*******************************************************************************
+* Dotconf's options' definitions.                                              *
+*******************************************************************************/
 static const configoption_t options[] = {
         /* General section */
         { beg_General_section_str,       ARG_NONE,   beg_General_section_cb,       NULL, CTX_ALL                    },
@@ -213,8 +215,10 @@ static const configoption_t options[] = {
         LAST_OPTION
 };
 
+
 /**
  * @brief get_conf Get pointer to configuration.
+ *
  * @return Pointer to conf_t or NULL if read_conf() has not been
  *         invoked yet or failed.
  */
@@ -222,8 +226,10 @@ inline conf_t *get_conf() {
         return conf;
 }
 
+
 /**
  * @brief get_log Get pointer to logging framework.
+ *
  * @return Pointer to log_t or NULL if read_conf() has not been
  *         invoked yet or failed.
  */
@@ -231,8 +237,10 @@ inline log_t *get_log() {
         return log;
 }
 
+
 /**
  * @brief get_ops Get pointer to operatons data-structure.
+ *
  * @return Pointer to ops_t or NULL if read_conf() has not been
  *         invoked yet or failed.
  */
@@ -240,12 +248,16 @@ inline ops_t *get_ops() {
         return ops;
 }
 
+
 /**
  * @brief init_dependent_members Initialize remaining members of configuration.
- * @return 0 on success, -1 on failure
+ *
+ * @return  0: when all system calls were successful
+ *         -1: when at least one system call has failed
  */
 static int init_dependent_members(void) {
-        /* pathconf will not change errno and will return -1 if requested resource does not have limit */
+        /* pathconf will not change errno and will return -1 if requested
+           resource does not have limit */
         errno = 0;
         ssize_t path_max = pathconf(conf->fs_mount_point, _PC_PATH_MAX);
         if ((path_max == -1) && !errno) {
@@ -259,20 +271,32 @@ static int init_dependent_members(void) {
         return 0;
 }
 
+
 /**
  * @brief read_conf Read configuration from file.
+ *
  * @note Does not handle the case when line length exceeded LINE_MAX limit.
  * @note Does not handle the case when file contains duplicate keys.
- * @param[in] conf_path Path to a configuration file. If NULL then use default configuration.
- * @return 0 on success, -1 on failure.
+ *
+ * @param[in] conf_path Path to a configuration file.
+ *                      If NULL then use default configuration.
+ *
+ * @return  0: configuration has successfully been read from file
+ *         -1: errors is system calls occured or configuration file is invalid
  */
 int read_conf(const char *conf_path) {
-        if (conf != NULL) {
+        if ((conf != NULL) || (log != NULL) || (ops != NULL)) {
                 return -1;
         }
 
         conf = malloc(sizeof(conf_t));
-        if (conf == NULL) {
+        log  = malloc(sizeof(log_t));
+        ops  = malloc(sizeof(ops_t));
+        if ((conf == NULL) || (log == NULL) || (ops == NULL)) {
+                free(conf);
+                free(log);
+                free(ops);
+
                 return -1;
         }
 
