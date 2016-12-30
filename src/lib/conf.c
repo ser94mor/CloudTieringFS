@@ -75,7 +75,7 @@ SECTIONS(DECLARE_SECTION_STR, SEMICOLON);
 
 
 /*******************************************************************************
-* Operations' definitions.                                                      *
+* Operations' definitions.                                                     *
 *******************************************************************************/
 
 /* string names of supported object storage protocols */
