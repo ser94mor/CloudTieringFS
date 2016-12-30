@@ -230,15 +230,17 @@ int      queue_front(queue_t *queue, char *data, size_t *data_size);
         action(Internal)     sep  \
         action(S3RemoteStore)
 
-/* CTX_ALL expand to 0, that is why '__COUNTER__ + 1' value is used below */
-#define DECLARE_SECTION(elem)                                   \
-        static const char beg_##elem##_sect[] = "<"  #elem ">", \
-                          end_##elem##_sect[] = "</" #elem ">"
+/* a macro-function to declare begining and end tokens for a given section */
+#define DECLARE_SECTION_STR(elem)                                      \
+        static const char beg_##elem##_section_str[] = "<"  #elem ">", \
+                          end_##elem##_section_str[] = "</" #elem ">"
 
-#define GENERATE_ENUM_CUSTOM(item) ctx_##item = __COUNTER__ + 1
+/* a macro-function that produces dotconf's context value
+   (it is greater than 0 because dotconf's CTX_ALL section macros is 0) */
+#define SECTION_CTX(elem)     ENUMERIZE(elem) + 1
 
 enum section_e {
-        SECTIONS(GENERATE_ENUM_CUSTOM, COMMA),
+        SECTIONS(ENUMERIZE, COMMA),
 };
 
 
