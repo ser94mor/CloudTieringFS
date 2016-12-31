@@ -4,5 +4,4 @@ between a POSIX-compliant file system (local or distributed)
 and a cloud object storage at the file level while maintaining the POSIX semantics.
 
 ### Authorship
-Sergey Morozov - 
-sergey94morozov@gmail.com
+Sergey Morozov, sergey94morozov@gmail.com  
