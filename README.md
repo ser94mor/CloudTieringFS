@@ -1,4 +1,4 @@
-# cloudtiering - Policy Driven Multitier Filesystem
+# cloudtiering - Policy-Driven Multi-Tier File System
 A daemon and a shared library that together enable support of tiering
 between local file system (which also could be distributed)
 and cloud object store while maintaining POSIX semantics.
