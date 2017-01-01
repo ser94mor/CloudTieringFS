@@ -80,9 +80,10 @@
 #define EMPTY
 
 /* common macroses representing macro-functions */
-#define ENUMERIZE(elem)      e_##elem
-#define STRINGIFY(elem)      #elem
-#define MAP_TO_ONE(elem)     1
+#define ENUMERIZE(elem)               e_##elem
+#define ENUMERIZE_FIRST(elem, ...)    ENUMERIZE(elem)
+#define STRINGIFY(elem)               #elem
+#define MAP_TO_ONE(elem)              1
 
 
 /*******************************************************************************
@@ -266,6 +267,39 @@ enum section_e {
 /* following enum values are indexes to string repserentations */
 enum protocol_enum {
         PROTOCOLS(ENUMERIZE, COMMA),
+};
+
+/*
+ * Definitions related to extended attributes used to store
+ * information about remote storage object location.
+ */
+#define XATTR_NAMESPACE             "trusted"
+#define LOCAL_STORE                 0x01
+#define REMOTE_STORE                0x10
+
+
+#define XATTR_KEY(key, size, type)              XATTR_NAMESPACE "." #key
+#define XATTR_MAX_SIZE(key, size, type)         size
+#define DECLARE_XATTR_TYPE(key, size, type)     typedef type xattr_##key##_t
+
+
+/*
+ * - S3_MAX_KEY_SIZE is defined in libs3.h
+ * - "locked" is extended attribute indicating that some thread is currently
+ *   working with this file
+ */
+#define XATTRS(action, sep)                                            \
+                                                                       \
+        /* specific for s3 protocol */                                 \
+        action(s3_object_id, S3_MAX_KEY_SIZE,       char *)        sep \
+                                                                       \
+        /* common to all remote storage protocols */                   \
+        action(location,     sizeof(unsigned char), unsigned char) sep \
+        action(locked,       0,                     void)
+
+/* declare enum of extended attributes */
+enum xattr_enum {
+        XATTRS(ENUMERIZE_FIRST, COMMA),
 };
 
 /*

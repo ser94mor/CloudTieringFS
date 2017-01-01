@@ -40,48 +40,21 @@
 #define ERR_MSG_BUF_LEN    1024
 static __thread char err_buf[ERR_MSG_BUF_LEN];
 
-/*
- * Definitions related to extended attributes used to store
- * information about remote storage object location.
- */
-#define XATTR_NAMESPACE             "trusted"
-#define LOCAL_STORE                 0x01
-#define REMOTE_STORE                0x10
-
-/*
- * - S3_MAX_KEY_SIZE is defined in libs3.h
- * - "locked" is extended attribute indicating that some thread is currently working with this file
- */
-#define FOREACH_XATTR(action) \
-        action(s3_object_id, S3_MAX_KEY_SIZE, char *) \
-        action(location, sizeof(unsigned char), unsigned char) \
-        action(locked, 0, void)
-
-#define XATTR_ENUM(key, size, type)       key,
-#define XATTR_STR(key, size, type)        XATTR_NAMESPACE "." #key,
-#define XATTR_MAX_SIZE(key, size, type)   size,
-#define XATTR_TYPEDEF(key, size, type)    typedef type xattr_##key##_t;
-
-/* declare enum of extended attributes */
-enum xattr_enum {
-        FOREACH_XATTR(XATTR_ENUM)
-};
-
 /* declare array of extended attributes' keys */
-static char *xattr_str[] = {
-        FOREACH_XATTR(XATTR_STR)
+static const char *xattr_str[] = {
+        XATTRS(XATTR_KEY, COMMA),
 };
 
 /* declare array of extended attributes' sizes */
 static size_t xattr_max_size[] = {
-        FOREACH_XATTR(XATTR_MAX_SIZE)
+        XATTRS(XATTR_MAX_SIZE, COMMA),
 };
 
 /* declare types of extended attributes' values */
-FOREACH_XATTR(XATTR_TYPEDEF);
+XATTRS(DECLARE_XATTR_TYPE, SEMICOLON);
 
 static int is_file_locked(const char *path) {
-        int ret = getxattr(path, xattr_str[locked], NULL, 0);
+        int ret = getxattr(path, xattr_str[e_locked], NULL, 0);
 
         if (ret == -1) {
                 if (errno == ENOATTR) {
@@ -93,7 +66,7 @@ static int is_file_locked(const char *path) {
 
                 LOG(ERROR,
                     "failed to get extended attribute %s of file %s [reason: %s]",
-                    xattr_str[locked],
+                    xattr_str[e_locked],
                     path,
                     err_buf);
 
@@ -104,7 +77,7 @@ static int is_file_locked(const char *path) {
 }
 
 static int lock_file(const char *path) {
-        int ret = setxattr(path, xattr_str[locked], NULL, 0, XATTR_CREATE);
+        int ret = setxattr(path, xattr_str[e_locked], NULL, 0, XATTR_CREATE);
 
         if (ret == -1) {
                 /* strerror_r() with very low probability can fail; ignore such failures */
@@ -112,7 +85,7 @@ static int lock_file(const char *path) {
 
                 LOG(ERROR,
                     "failed to set extended attribute %s to file %s [reason: %s]",
-                    xattr_str[locked],
+                    xattr_str[e_locked],
                     path,
                     err_buf);
 
@@ -123,7 +96,7 @@ static int lock_file(const char *path) {
 }
 
 static int unlock_file(const char *path) {
-        int ret = removexattr(path, xattr_str[locked]);
+        int ret = removexattr(path, xattr_str[e_locked]);
 
         if (ret == -1) {
                 /* strerror_r() with very low probability can fail; ignore such failures */
@@ -131,7 +104,7 @@ static int unlock_file(const char *path) {
 
                 LOG(ERROR,
                     "failed to remove extended attribute %s of file %s [reason: %s]",
-                    xattr_str[locked],
+                    xattr_str[e_locked],
                     path,
                     err_buf);
 
@@ -147,8 +120,8 @@ static int unlock_file(const char *path) {
  * @return 0 is file data on remote store and >0 when file data on local store; -1 on error
  */
 static int is_file_local(const char *path) {
-        size_t size = xattr_max_size[location];
-        const char *xattr = xattr_str[location];
+        size_t size = xattr_max_size[e_location];
+        const char *xattr = xattr_str[e_location];
         xattr_location_t loc = 0;
 
         if (getxattr(path, xattr, &loc, size) == -1) {
@@ -549,7 +522,7 @@ int s3_move_file_out(const char *path) {
         }
         LOG(DEBUG, "file %s was uploaded to remote store successfully", path);
 
-        const char *key = xattr_str[s3_object_id];
+        const char *key = xattr_str[e_s3_object_id];
         xattr_s3_object_id_t value = (xattr_s3_object_id_t)path;
 
         if (setxattr(path, key, value, strlen(value) + 1, XATTR_CREATE) == -1) {
@@ -566,10 +539,10 @@ int s3_move_file_out(const char *path) {
                 return -1;
         }
 
-        key = xattr_str[location];
+        key = xattr_str[e_location];
         xattr_location_t location_val = REMOTE_STORE;
 
-        if (setxattr(path, key, &location_val, xattr_max_size[location], XATTR_CREATE) == -1) {
+        if (setxattr(path, key, &location_val, xattr_max_size[e_location], XATTR_CREATE) == -1) {
                 /* strerror_r() with very low probability can fail; ignore such failures */
                 strerror_r(errno, err_buf, ERR_MSG_BUF_LEN);
 
