@@ -20,6 +20,20 @@
 
 
 /*******************************************************************************
+* COMMON CONSTANTS                                                             *
+* ----------------                                                             *
+*                                                                              *
+* TODO: write description                                                      *
+*******************************************************************************/
+
+/* constant representing string with program name */
+#define PROGRAM_NAME        "cloudtiering"
+
+/* buffer length for error messages; mostly for errno descriptions */
+#define ERR_MSG_BUF_LEN     1024
+
+
+/*******************************************************************************
 * MACROSES                                                                     *
 * --------                                                                     *
 *                                                                              *
@@ -174,6 +188,7 @@ typedef struct {
 /*******************************************************************************
 * QUEUE                                                                        *
 * -----                                                                        *
+*                                                                              *
 * TODO: write description                                                      *
 *******************************************************************************/
 
@@ -221,6 +236,7 @@ int      queue_front(queue_t *queue, char *data, size_t *data_size);
 /*******************************************************************************
 * CONFIGURATION                                                                *
 * -------------                                                                *
+*                                                                              *
 * TODO: write description                                                      *
 *******************************************************************************/
 
@@ -239,6 +255,7 @@ int      queue_front(queue_t *queue, char *data, size_t *data_size);
    (it is greater than 0 because dotconf's CTX_ALL section macros is 0) */
 #define SECTION_CTX(elem)     ENUMERIZE(elem) + 1
 
+/* enum of supported sections in configuration */
 enum section_enum {
         SECTIONS(ENUMERIZE, COMMA),
 };
@@ -247,6 +264,7 @@ enum section_enum {
 /*******************************************************************************
 * OPERATIONS                                                                   *
 * ----------                                                                   *
+*                                                                              *
 * TODO: write description                                                      *
 *******************************************************************************/
 
@@ -264,47 +282,48 @@ enum section_enum {
                 .disconnect = elem##_disconnect \
         }
 
-/* following enum values are indexes to string repserentations */
+/* enum of supported protocols */
 enum protocol_enum {
         PROTOCOLS(ENUMERIZE, COMMA),
 };
 
-/*
- * Definitions related to extended attributes used to store
- * information about remote storage object location.
- */
+/* the constant representing extended attributes namespace */
 #define XATTR_NAMESPACE             "trusted"
-#define LOCAL_STORE                 0x01
-#define REMOTE_STORE                0x10
 
+/* constants (identifiers) representing local and remote storages */
+#define LOCAL_STORAGE                 0x01
+#define REMOTE_STORAGE                0x10
 
-#define XATTR_KEY(key, size, type)              XATTR_NAMESPACE "." #key
-#define XATTR_MAX_SIZE(key, size, type)         size
-#define DECLARE_XATTR_TYPE(key, size, type)     typedef type xattr_##key##_t
-
-
-/*
- * - S3_MAX_KEY_SIZE is defined in libs3.h
- * - "locked" is extended attribute indicating that some thread is currently
- *   working with this file
- */
+/* a list of all possible extended attributes with sizes in bytes and types of
+   their values;
+   - s3_object_id's size is taken from documentation:
+     http://docs.aws.amazon.com/AmazonS3/latest/dev/UsingMetadata.html;
+   - location's value should be able to store *_STORAGE values;
+   - locked attribute does not have value, so its size is 0 */
 #define XATTRS(action, sep)                                            \
                                                                        \
         /* specific for s3 protocol */                                 \
-        action(s3_object_id, S3_MAX_KEY_SIZE,       char *)        sep \
+        action(s3_object_id, 1024, char *)                         sep \
                                                                        \
         /* common to all remote storage protocols */                   \
-        action(location,     sizeof(unsigned char), unsigned char) sep \
-        action(locked,       0,                     void)
+        action(location, sizeof(unsigned char), unsigned char)     sep \
+        action(locked, 0, void)
 
-/* declare enum of extended attributes */
+/* a macro-function producing full name of extended attribute */
+#define XATTR_KEY(key, size, type) \
+        XATTR_NAMESPACE "." PROGRAM_NAME "." STRINGIFY(key)
+
+/* a macro-fucntion to get size in bytes of extended attribute's value */
+#define XATTR_MAX_SIZE(key, size, type)         size
+
+/* a macro-function to declare type of extended attribute's value */
+#define DECLARE_XATTR_TYPE(key, size, type)     typedef type xattr_##key##_t
+
+/* enum of supported extended attributes */
 enum xattr_enum {
         XATTRS(ENUMERIZE, COMMA),
 };
 
-/*
- * OPS
- */
 
 typedef struct {
         enum xattr_enum type;
@@ -370,12 +389,5 @@ ops_t  *get_ops();
 
 int scanfs(queue_t *in_q, queue_t *out_q);
 
-/**
- * OTHER COMMON DEFINITIONS
- */
-
-/* thread-local buffer for error messages;
- * 1024 is more than enough to store errno descriptions */
-#define ERR_MSG_BUF_LEN    1024
 
 #endif /* CLOUDTIERING_H */

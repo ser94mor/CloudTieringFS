@@ -16,7 +16,7 @@
  */
 
 #define _POSIX_C_SOURCE    200112L    /* required for strerror_r() */
-#define _XOPEN_SOURCE 500    /* needed to use nftw() */
+#define _XOPEN_SOURCE      500        /* needed to use nftw() */
 
 #include <string.h>
 #include <stdio.h>
@@ -31,10 +31,11 @@
 #include <attr/xattr.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <libs3.h>
 
 #include "cloudtiering.h"
 
+
+/* buffer to store error messages (mostly errno messages) */
 static __thread char err_buf[ERR_MSG_BUF_LEN];
 
 /* declare array of extended attributes' keys */
@@ -50,34 +51,32 @@ static size_t xattr_max_size[] = {
 /* declare types of extended attributes' values */
 XATTRS(DECLARE_XATTR_TYPE, SEMICOLON);
 
-static int is_file_locked(const char *path) {
-        int ret = getxattr(path, xattr_str[e_locked], NULL, 0);
-
-        if (ret == -1) {
-                if (errno == ENOATTR) {
-                        return 0; /* false; not locked */
-                }
-
-                /* strerror_r() with very low probability can fail; ignore such failures */
-                strerror_r(errno, err_buf, ERR_MSG_BUF_LEN);
-
-                LOG(ERROR,
-                    "failed to get extended attribute %s of file %s [reason: %s]",
-                    xattr_str[e_locked],
-                    path,
-                    err_buf);
-
-                return -1; /* error indication */
-        }
-
-        return 1; /* true; file is locked */
-}
-
+/**
+ * @brief lock_file Lock file using extended attribute as an indicator.
+ *
+ * @note Operation is atomic according to
+ *       http://man7.org/linux/man-pages/man7/xattr.7.html.
+ *
+ * @param[in] path Path of file to set lock.
+ *
+ * @return  0: file was locked
+ *         -1: file was not locked due to failure or lock was already set on
+ *             this file previously
+ */
 static int lock_file(const char *path) {
         int ret = setxattr(path, xattr_str[e_locked], NULL, 0, XATTR_CREATE);
 
         if (ret == -1) {
-                /* strerror_r() with very low probability can fail; ignore such failures */
+                if (errno == EEXIST) {
+                        /* file is already locked; this is not a system error
+                           but a caller of this function should not proceed
+                           futher with his actions */
+
+                        return -1;
+                }
+
+                /* strerror_r() with very low probability can fail;
+                   ignore such failures */
                 strerror_r(errno, err_buf, ERR_MSG_BUF_LEN);
 
                 LOG(ERROR,
@@ -92,11 +91,26 @@ static int lock_file(const char *path) {
         return 0;
 }
 
+/**
+ * @brief unlock_file Unlock file via removal of extended attribute.
+ *
+ * @note Operation is atomic according to
+ *       http://man7.org/linux/man-pages/man7/xattr.7.html.
+ *
+ * @param[in] path Path of file to unset lock.
+ *
+ * @return  0: file was unlocked
+ *         -1: file was not unlocked due to failure
+ */
 static int unlock_file(const char *path) {
         int ret = removexattr(path, xattr_str[e_locked]);
 
         if (ret == -1) {
-                /* strerror_r() with very low probability can fail; ignore such failures */
+                /* non-existance of lock indicates an error in logic
+                   of this program */
+
+                /* strerror_r() with very low probability can fail;
+                   ignore such failures */
                 strerror_r(errno, err_buf, ERR_MSG_BUF_LEN);
 
                 LOG(ERROR,
@@ -126,7 +140,8 @@ static int is_file_local(const char *path) {
                         return 1; /* true */
                 }
 
-                /* strerror_r() with very low probability can fail; ignore such failures */
+                /* strerror_r() with very low probability can fail;
+                   ignore such failures */
                 strerror_r(errno, err_buf, ERR_MSG_BUF_LEN);
 
                 LOG(ERROR,
@@ -138,7 +153,7 @@ static int is_file_local(const char *path) {
                 return -1; /* error indication */
         }
 
-        return !!(loc == LOCAL_STORE);
+        return !!(loc == LOCAL_STORAGE);
 }
 
 /**
@@ -168,7 +183,7 @@ int move_file_out(const char *path) {
         LOG(DEBUG, "file %s was uploaded to remote store successfully", path);
 
         const char *key = xattr_str[e_location];
-        xattr_location_t location_val = REMOTE_STORE;
+        xattr_location_t location_val = REMOTE_STORAGE;
 
         if (setxattr(path, key, &location_val, xattr_max_size[e_location], XATTR_CREATE) == -1) {
                 /* strerror_r() with very low probability can fail; ignore such failures */
@@ -306,7 +321,6 @@ static int update_evict_queue(const char *fpath, const struct stat *sb,  int typ
 
         if (S_ISREG(path_stat.st_mode) &&
             is_file_local(fpath) &&
-            !is_file_locked(fpath) &&
             (path_stat.st_atime + 600) < time(NULL)) {
                 do {
                         if (queue_push(out_queue, (char *)fpath, strlen(fpath) + 1) == -1) {

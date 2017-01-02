@@ -6,6 +6,11 @@ and a cloud object storage at the file level while maintaining the POSIX semanti
 ### Installation
 TODO
 
+### Dependencies
+libs3
+dotconf
+libcap-progs
+
 ### Licensing
 **cloudtiering** is licensed under the [GNU General Public License, Version 3](LICENSE.md).
 

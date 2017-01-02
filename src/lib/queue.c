@@ -39,7 +39,6 @@ static inline size_t queue_bytes_per_elem(const queue_t *queue) {
         return (sizeof(size_t) + queue->data_max_size);
 }
 
-
 /**
  * @brief queue_buf_end Returns a pointer to queue's buffer end.
  *
@@ -53,7 +52,6 @@ static inline size_t queue_bytes_per_elem(const queue_t *queue) {
 static inline const char *queue_buf_end(const queue_t *queue) {
         return (queue->buf + queue->buf_size);
 }
-
 
 /**
  * @brief queue_elem_size Returns a size in bytes of a given element of a queue.
@@ -69,7 +67,6 @@ static inline size_t queue_elem_size(const char *elem) {
         return (*((size_t *)elem));
 }
 
-
 /**
  * @brief queue_elem_data A pointer to an element's data.
  *
@@ -83,7 +80,6 @@ static inline size_t queue_elem_size(const char *elem) {
 static inline char *queue_elem_data(const char *elem) {
         return ((char *)elem + sizeof(size_t));
 }
-
 
 /**
  * @brief queue_contains Checks a presence of a given data in a queue.
@@ -126,7 +122,6 @@ static int queue_contains(queue_t *queue, const char *data, size_t data_size) {
         return 0; /* false */
 }
 
-
 /**
  * @brief queue_empty Indicates that a queue is empty.
  *
@@ -155,7 +150,6 @@ int queue_empty(queue_t *queue) {
         return ret;
 }
 
-
 /**
  * @brief queue_full Indicates that a queue is full.
  *
@@ -183,7 +177,6 @@ int queue_full(queue_t *queue) {
 
         return ret;
 }
-
 
 /**
  * @brief queue_push Pushes an element into a queue if the queue is not full.
@@ -237,7 +230,6 @@ int queue_push(queue_t *queue, const char *data, size_t data_size) {
         return 0;
 }
 
-
 /**
  * @brief queue_pop Pops an element from a queue if the queue is not empty.
  *
@@ -275,7 +267,6 @@ int queue_pop(queue_t *queue) {
 
         return 0;
 }
-
 
 /**
  * @brief queue_front Fills provided buffers for a data and a data's size
@@ -322,7 +313,6 @@ int queue_front(queue_t *queue, char *data, size_t *data_size) {
         return 0;
 }
 
-
 /**
  * @brief queue_alloc Allocates memory for a queue_t data structure and
  *                    initializes its members.
@@ -361,7 +351,6 @@ queue_t *queue_alloc(size_t max_size, size_t data_max_size) {
 
         return queue;
 }
-
 
 /**
  * @brief queue_free Frees all memory allocated for a given queue.
