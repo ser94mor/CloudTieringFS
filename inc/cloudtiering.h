@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2016  Sergey Morozov <sergey94morozov@gmail.com>
+ * Copyright (C) 2016, 2017  Sergey Morozov <sergey94morozov@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -80,10 +80,9 @@
 #define EMPTY
 
 /* common macroses representing macro-functions */
-#define ENUMERIZE(elem)               e_##elem
-#define ENUMERIZE_FIRST(elem, ...)    ENUMERIZE(elem)
-#define STRINGIFY(elem)               #elem
-#define MAP_TO_ONE(elem)              1
+#define ENUMERIZE(elem, ...)         e_##elem
+#define STRINGIFY(elem, ...)         #elem
+#define MAP_TO_ONE(elem, ...)        1
 
 
 /*******************************************************************************
@@ -133,14 +132,14 @@
         action(simple)
 
 /* enum of supported logging frameworks */
-enum log_e {
+enum log_enum {
         LOGGERS(ENUMERIZE, COMMA),
 };
 
 /* definition of framework-agnostic logger */
 typedef struct {
         /* logging framework type */
-        enum log_e type;
+        enum log_enum type;
 
         /* framework-agnostic logging initializer */
         void (*open_log)(const char *);
@@ -240,7 +239,7 @@ int      queue_front(queue_t *queue, char *data, size_t *data_size);
    (it is greater than 0 because dotconf's CTX_ALL section macros is 0) */
 #define SECTION_CTX(elem)     ENUMERIZE(elem) + 1
 
-enum section_e {
+enum section_enum {
         SECTIONS(ENUMERIZE, COMMA),
 };
 
@@ -256,12 +255,13 @@ enum section_e {
         action(s3)
 
 /* a macro-function to declare ops_t data-structure for a given protocol */
-#define DECLARE_OPS(elem)                                                    \
-        static ops_t elem##_ops = {                                          \
-                .init_remote_store_access = elem##_init_remote_store_access, \
-                .move_file_in             = elem##_move_file_in,             \
-                .move_file_out            = elem##_move_file_out,            \
-                .term_remote_store_access = elem##_term_remote_store_access  \
+#define DECLARE_OPS(elem)                       \
+        static ops_t elem##_ops = {             \
+                .type       = ENUMERIZE(elem),  \
+                .connect    = elem##_connect,   \
+                .download   = elem##_download,  \
+                .upload     = elem##_upload,    \
+                .disconnect = elem##_disconnect \
         }
 
 /* following enum values are indexes to string repserentations */
@@ -299,7 +299,7 @@ enum protocol_enum {
 
 /* declare enum of extended attributes */
 enum xattr_enum {
-        XATTRS(ENUMERIZE_FIRST, COMMA),
+        XATTRS(ENUMERIZE, COMMA),
 };
 
 /*
@@ -307,11 +307,17 @@ enum xattr_enum {
  */
 
 typedef struct {
-        int  (*init_remote_store_access)(void);
-        int  (*move_file_in)(const char *path);
-        int  (*move_file_out)(const char *path);
-        void (*term_remote_store_access)(void);
+        enum xattr_enum type;
+        int  (*connect)(void);
+        int  (*download)(const char *path);
+        int  (*upload)(const char *path);
+        void (*disconnect)(void);
 } ops_t;
+
+int  s3_connect(void);
+int  s3_download(const char *path);
+int  s3_upload(const char *path);
+void s3_disconnect(void);
 
 int move_file(queue_t *queue);
 
@@ -363,5 +369,13 @@ ops_t  *get_ops();
  */
 
 int scanfs(queue_t *in_q, queue_t *out_q);
+
+/**
+ * OTHER COMMON DEFINITIONS
+ */
+
+/* thread-local buffer for error messages;
+ * 1024 is more than enough to store errno descriptions */
+#define ERR_MSG_BUF_LEN    1024
 
 #endif /* CLOUDTIERING_H */

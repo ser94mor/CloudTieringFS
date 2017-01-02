@@ -10,4 +10,4 @@ TODO
 **cloudtiering** is licensed under the [GNU General Public License, Version 3](LICENSE.md).
 
 ### Authorship
-Sergey Morozov, sergey94morozov@gmail.com  
+Sergey Morozov, sergey94morozov@gmail.com

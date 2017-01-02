@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2016  Sergey Morozov <sergey94morozov@gmail.com>
+ * Copyright (C) 2016, 2017  Sergey Morozov <sergey94morozov@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -28,7 +28,6 @@
 
 #include "cloudtiering.h"
 #include "log.h"
-#include "ops.h"
 
 static conf_t *conf = NULL;
 static log_t  *log  = NULL;

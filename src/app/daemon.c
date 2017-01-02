@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2016  Sergey Morozov <sergey94morozov@gmail.com>
+ * Copyright (C) 2016, 2017  Sergey Morozov <sergey94morozov@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -98,7 +98,7 @@ static int init_data(queue_t **in_out_queue) {
                 return -1;
         }
 
-        if (conf->ops.init_remote_store_access() == -1) {
+        if (get_ops()->connect() == -1) {
                 LOG(ERROR, "unable to establish connection to remote store");
                 return -1;
         }
