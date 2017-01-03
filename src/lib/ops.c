@@ -126,9 +126,16 @@ static int unlock_file(const char *path) {
 }
 
 /**
- * @brief is_file_local Check whether file data is on local store or on remote.
- * @param[in] path Path to target file.
- * @return 0 is file data on remote store and >0 when file data on local store; -1 on error
+ * @brief is_file_local Check a location of file (local or remote).
+ *
+ * @note Operation is atomic according to
+ *       http://man7.org/linux/man-pages/man7/xattr.7.html.
+ *
+ * @param[in] path Path to file to check location.
+ *
+ * @return  1: if file is in local storage
+ *          0: if file is in remote storage
+ *         -1: error happen during an attempt to get extended attribute's value
  */
 static int is_file_local(const char *path) {
         size_t size = xattr_max_size[e_location];
@@ -157,9 +164,13 @@ static int is_file_local(const char *path) {
 }
 
 /**
- * @brief is_valid_path Checks if path is valid - exists and is is regular file.
- * @param[in] path Path to target file.
- * @return 0 if path is not valid and non-0 if path is valid.
+ * @brief is_valid_path Checks if path is valid, i.e. exists and
+ *                      file is regular.
+ *
+ * @param[in] path Path to file to validate.
+ *
+ * @return 1: if path is valid
+ *         0: if path is not valid
  */
 static int is_valid_path(const char *path) {
         struct stat path_stat;
