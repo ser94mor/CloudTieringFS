@@ -339,6 +339,7 @@ int  s3_upload(const char *path);
 void s3_disconnect(void);
 
 int move_file(queue_t *queue);
+int is_file_local(const char *path);
 
 
 #include <stddef.h>

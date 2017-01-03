@@ -16,7 +16,7 @@
  */
 
 #define _POSIX_C_SOURCE    200112L    /* required for strerror_r() */
-#define _XOPEN_SOURCE      500        /* needed to use nftw() */
+#define _XOPEN_SOURCE      500        /* required for truncate() */
 
 #include <string.h>
 #include <stdio.h>
@@ -25,7 +25,6 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <string.h>
-#include <ftw.h>
 #include <sys/resource.h>
 #include <sys/types.h>
 #include <attr/xattr.h>
@@ -71,6 +70,9 @@ static int lock_file(const char *path) {
                         /* file is already locked; this is not a system error
                            but a caller of this function should not proceed
                            futher with his actions */
+                        LOG(DEBUG,
+                            "unable to lock file %s; it is already locked",
+                            path);
 
                         return -1;
                 }
@@ -80,7 +82,8 @@ static int lock_file(const char *path) {
                 strerror_r(errno, err_buf, ERR_MSG_BUF_LEN);
 
                 LOG(ERROR,
-                    "failed to set extended attribute %s to file %s [reason: %s]",
+                    "failed to set extended attribute %s to file %s "
+                    "[reason: %s]",
                     xattr_str[e_locked],
                     path,
                     err_buf);
@@ -114,7 +117,8 @@ static int unlock_file(const char *path) {
                 strerror_r(errno, err_buf, ERR_MSG_BUF_LEN);
 
                 LOG(ERROR,
-                    "failed to remove extended attribute %s of file %s [reason: %s]",
+                    "failed to remove extended attribute %s of file %s "
+                    "[reason: %s]",
                     xattr_str[e_locked],
                     path,
                     err_buf);
@@ -137,7 +141,7 @@ static int unlock_file(const char *path) {
  *          0: if file is in remote storage
  *         -1: error happen during an attempt to get extended attribute's value
  */
-static int is_file_local(const char *path) {
+int is_file_local(const char *path) {
         size_t size = xattr_max_size[e_location];
         const char *xattr = xattr_str[e_location];
         xattr_location_t loc = 0;
@@ -152,7 +156,8 @@ static int is_file_local(const char *path) {
                 strerror_r(errno, err_buf, ERR_MSG_BUF_LEN);
 
                 LOG(ERROR,
-                    "failed to get extended attribute %s of file %s [reason: %s]",
+                    "failed to get extended attribute %s of file %s "
+                    "[reason: %s]",
                     xattr,
                     path,
                     err_buf);
@@ -181,77 +186,123 @@ static int is_valid_path(const char *path) {
         return 1; /* true */
 }
 
-int move_file_out(const char *path) {
+/**
+ * @brief upload_file Upload file to remote storage from local storage.
+ *
+ * @param[in] path Path to a file to upload.
+ *
+ * @return  0: file has been upload to remote storage properly and truncated
+ *         -1: file has not been upload due to error or access to file
+ *             has happen during eviction
+ */
+static int upload_file(const char *path) {
+        /* set lock to file to prevent other threads' and processes'
+           access to file's data */
         if (lock_file(path) == -1) {
                 return -1;
         }
 
+        /* upload file's data to remote storage */
         if (get_ops()->upload(path) == -1) {
-                LOG(ERROR, "failed to put object into remote store for file %s", path);
-                /* TODO: unlock_file() in all error places */
-                return -1;
+                goto err_unlock; /* unset lock and exit */
         }
-        LOG(DEBUG, "file %s was uploaded to remote store successfully", path);
 
+        /* set file's location information */
         const char *key = xattr_str[e_location];
         xattr_location_t location_val = REMOTE_STORAGE;
-
-        if (setxattr(path, key, &location_val, xattr_max_size[e_location], XATTR_CREATE) == -1) {
-                /* strerror_r() with very low probability can fail; ignore such failures */
+        if (setxattr(path, key, &location_val, xattr_max_size[e_location],
+                     XATTR_CREATE) == -1) {
+                /* strerror_r() with very low probability can fail;
+                   ignore such failures */
                 strerror_r(errno, err_buf, ERR_MSG_BUF_LEN);
 
                 LOG(ERROR,
-                    "failed to set extended attribute %s with value %s to file %s [reason: %s]",
+                    "failed to set extended attribute %s with value %s to "
+                    "file %s [reason: %s]",
                     key,
                     path,
                     path,
                     err_buf);
 
+                goto err_unlock; /* unset lock and exit */
+        }
+
+        /* truncate file */
+        if (truncate(path, 0) == -1) {
+                /* TODO: handle EINTR case */
+
+                /* strerror_r() with very low probability can fail;
+                   ignore such failures */
+                strerror_r(errno, err_buf, ERR_MSG_BUF_LEN);
+
+                LOG(ERROR,
+                    "failed to truncate file %s [reason: %s]",
+                    path,
+                    err_buf);
+
+                /* remove location attribute, unset lock and exit */
+                goto err_location_unlock;
+        }
+
+        /* all actions indended to file upload succeeded; just need to unlock */
+        if (unlock_file(path) == -1) {
+                /* TODO: do some repair actions;
+                         files should not be left locked */
                 return -1;
         }
 
-        int ret = 0;
-        int fd;
-        if ((fd = open(path, O_TRUNC | O_WRONLY)) == -1) {
-                /* strerror_r() with very low probability can fail; ignore such failures */
+        return 0;
+
+        err_location_unlock:
+        /* remove location attribute */
+        if (removexattr(path, xattr_str[e_location]) == -1) {
+                /* non-existance of location attribute indicates an error
+                   in logic of this program */
+
+                /* strerror_r() with very low probability can fail;
+                   ignore such failures */
                 strerror_r(errno, err_buf, ERR_MSG_BUF_LEN);
 
                 LOG(ERROR,
-                    "failed to execute open() to truncate file %s [reason: %s]",
+                    "failed to remove extended attribute %s of file %s "
+                    "[reason: %s]",
+                    xattr_str[e_location],
                     path,
                     err_buf);
-
-                ret = -1;
         }
 
-        if (close(fd) == -1) {
-                /* strerror_r() with very low probability can fail; ignore such failures */
-                strerror_r(errno, err_buf, ERR_MSG_BUF_LEN);
-
-                LOG(ERROR,
-                    "failed to execute close() on file %s [reason: %s]",
-                    path,
-                    err_buf);
-
-                ret = -1;
-        }
-
+        err_unlock:
+        /* unset lock from file */
         if (unlock_file(path) == -1) {
-                ret = -1;
+                /* TODO: do some repair actions;
+                         files should not be left locked */
         }
 
-        return ret;
+        return -1;
 }
 
-int move_file_in(const char *path) {
+/**
+ * @brief dowload_file Download file from remote storage to local storage.
+ *
+ * @param[in] path Path to file to download.
+ *
+ * @return  0: file has been successfully dowloaded
+ *         -1: failure happen due dowload of file or
+ *             file is currently being downloaded by another thread
+ */
+static int dowload_file(const char *path) {
         /* TODO: need to implement this function */
         return -1;
 }
 
 /**
- * @brief move_file Move file on the front of the queue in or out (obvious from the file attributes).
- * @param[in] queue Queue with candidate files for moving in or out.
- * @return -1 on failure; 0 on success
+ * @brief move_file Download or upload file in the front of the queue.
+ *                  Move direction is obvious from file attributes.
+ *
+ * @param[in,out] queue Queue with candidate files for download or upload.
+ *
+ * @return  0: download or upload operation succeeded
+ *         -1: failure happen and download or upload was not successful
  */
 int move_file(queue_t *queue) {
         if (!queue_empty(queue)) {
@@ -277,100 +328,47 @@ int move_file(queue_t *queue) {
                         goto err;
                 }
 
-                int local_flag = 0;
-                if (is_file_local(path)) {
-                        local_flag = 1;
-
-                        /* local files should be moved out */
-                        if (move_file_out(path) == -1) {
-                                sprintf(err_buf, "failed to move file %s out", path);
+                int local_flag = is_file_local(path);
+                if (local_flag == -1) {
+                        /* do nothing if unable to determine file's location */
+                        sprintf(err_buf,
+                                "unable to determine file's location "
+                                "[file: %s]",
+                                path);
+                        goto err;
+                } else if (local_flag) {
+                        /* local files should be uploaded */
+                        if (upload_file(path) == -1) {
+                                sprintf(err_buf,
+                                        "upload of file %s failed",
+                                        path);
                                 goto err;
                         }
                 } else {
-                        local_flag = 0;
-
-                        /* remote files should be moved in */
-                        if (move_file_in(path) == -1) {
-                                sprintf(err_buf, "failed to move file %s in", path);
+                        /* remote files should be downloaded */
+                        if (dowload_file(path) == -1) {
+                                sprintf(err_buf,
+                                        "download of file %s failed",
+                                        path);
                                 goto err;
                         }
                 }
 
                 queue_pop(queue);
-                LOG(INFO, "file %s successfully moved %s", path, (local_flag ? "in" : "out"));
+                LOG(INFO,
+                    "file %s successfully %s",
+                    path,
+                    (local_flag ? "uploaded" : "downloaded"));
         } else {
-                //LOG(DEBUG, "queue is empty; nothing to move");
+                /* queue is empty; nothing to be done */
         }
 
-        /* return successfully if there are no files to move or move in/out operation was successful */
+        /* return successfully if there are no files to download/upload or
+           download/upload operation was successful */
         return 0;
 
         err:
         queue_pop(queue);
         LOG(ERROR, "failed to move file [reason: %s]", err_buf);
         return -1;
-}
-
-/*******************
- * Scan filesystem *
- * *****************/
-/* queue might be full and we need to perform several attempts giving a chance
- * for other threads to pop elements from queue */
-#define QUEUE_PUSH_RETRIES              5
-#define QUEUE_PUSH_ATTEMPT_SLEEP_SEC    1
-
-static queue_t *in_queue  = NULL;
-static queue_t *out_queue = NULL;
-
-static int update_evict_queue(const char *fpath, const struct stat *sb,  int typeflag, struct FTW *ftwbuf) {
-        int attempt = 0;
-
-        struct stat path_stat;
-        if (stat(fpath, &path_stat) == -1) {
-                return 0; /* just continue with the next files; non-zero will cause failure of nftw() */
-        }
-
-        if (S_ISREG(path_stat.st_mode) &&
-            is_file_local(fpath) &&
-            (path_stat.st_atime + 600) < time(NULL)) {
-                do {
-                        if (queue_push(out_queue, (char *)fpath, strlen(fpath) + 1) == -1) {
-                                ++attempt;
-                                continue;
-                        }
-                        LOG(DEBUG, "file '%s' pushed to out queue", fpath);
-                        break;
-                } while ((attempt < QUEUE_PUSH_RETRIES) && (queue_full((queue_t *)out_queue) > 0));
-        }
-
-        return 0;
-}
-
-int scanfs(queue_t *in_q, queue_t *out_q) {
-        conf_t *conf = get_conf();
-
-        in_queue  = in_q;
-        out_queue = out_q;
-
-        /* set maximum number of open files for nftw to a half of descriptor table size for current process */
-        struct rlimit rlim;
-        if (getrlimit(RLIMIT_NOFILE, &rlim) == -1) {
-                return -1;
-        }
-
-        /* rlim_cur value will be +1 higher than actual according to documentation */
-        if (rlim.rlim_cur <= 2) {
-                /* there are 1 or less descriptors available */
-                return -1;
-        }
-        int nopenfd = rlim.rlim_cur / 2;
-
-        /* stay within filesystem and do not follow symlinks */
-        int flags = FTW_MOUNT | FTW_PHYS;
-
-        if (nftw(conf->fs_mount_point, update_evict_queue, nopenfd, flags) == -1) {
-                return -1;
-        }
-
-        return 0;
 }
