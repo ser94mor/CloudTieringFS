@@ -145,7 +145,7 @@ static DOTCONF_CB(logger_cb) {
 
 static DOTCONF_CB(remote_store_protocol_cb) {
         if (strcmp(cmd->data.str, protocol_str[e_s3]) == 0) {
-                conf->ops = s3_ops;
+                ops = &s3_ops;
                 strcpy(conf->remote_store_protocol, cmd->data.str);
         } else {
                 return "unsupported remote store protocol";
@@ -159,23 +159,28 @@ static DOTCONF_CB(transfer_protocol_cb) {
         return NULL;
 }
 
-static DOTCONF_CB(s3_default_hostname_cb) {
+static DOTCONF_CB(hostname_cb) {
         strcpy(conf->s3_default_hostname, cmd->data.str);
         return NULL;
 }
 
-static DOTCONF_CB(s3_bucket_cb) {
+static DOTCONF_CB(bucket_cb) {
         strcpy(conf->s3_bucket, cmd->data.str);
         return NULL;
 }
 
-static DOTCONF_CB(s3_access_key_id_cb) {
+static DOTCONF_CB(access_key_id_cb) {
         strcpy(conf->s3_access_key_id, cmd->data.str);
         return NULL;
 }
 
-static DOTCONF_CB(s3_secret_access_key_cb) {
+static DOTCONF_CB(secret_access_key_cb) {
         strcpy(conf->s3_secret_access_key, cmd->data.str);
+        return NULL;
+}
+
+static DOTCONF_CB(operation_retries_cb) {
+        conf->s3_operation_retries = (int)cmd->data.value;
         return NULL;
 }
 
@@ -204,11 +209,12 @@ static const configoption_t options[] = {
 
         /* S3RemoteStore section */
         { beg_S3RemoteStore_section_str, ARG_NONE,   beg_S3RemoteStore_section_cb, NULL, CTX_ALL                    },
-        { "S3DefaultHostname",           ARG_STR,    s3_default_hostname_cb,       NULL, SECTION_CTX(S3RemoteStore) },
-        { "S3Bucket",                    ARG_STR,    s3_bucket_cb,                 NULL, SECTION_CTX(S3RemoteStore) },
-        { "S3AccessKeyId",               ARG_STR,    s3_access_key_id_cb,          NULL, SECTION_CTX(S3RemoteStore) },
-        { "S3SecretAccessKey",           ARG_STR,    s3_secret_access_key_cb,      NULL, SECTION_CTX(S3RemoteStore) },
+        { "Hostname",                    ARG_STR,    hostname_cb,                  NULL, SECTION_CTX(S3RemoteStore) },
+        { "Bucket",                      ARG_STR,    bucket_cb,                    NULL, SECTION_CTX(S3RemoteStore) },
+        { "AccessKeyId",                 ARG_STR,    access_key_id_cb,             NULL, SECTION_CTX(S3RemoteStore) },
+        { "SecretAccessKey",             ARG_STR,    secret_access_key_cb,         NULL, SECTION_CTX(S3RemoteStore) },
         { "TransferProtocol",            ARG_STR,    transfer_protocol_cb,         NULL, SECTION_CTX(S3RemoteStore) },
+        { "OperationRetries",            ARG_INT,    operation_retries_cb,         NULL, SECTION_CTX(S3RemoteStore) },
         { end_S3RemoteStore_section_str, ARG_NONE,   end_S3RemoteStore_section_cb, NULL, CTX_ALL                    },
 
         LAST_OPTION

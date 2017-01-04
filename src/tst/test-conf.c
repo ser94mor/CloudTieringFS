@@ -42,11 +42,12 @@ static const char *test_conf_str = \
         "    InQueueMaxSize           1111\n"               \
         "</Internal>\n"                                     \
         "<S3RemoteStore>\n"                                 \
-        "    S3DefaultHostname        s3_hostname\n"        \
-        "    S3Bucket                 s3.bucket\n"          \
-        "    S3AccessKeyId            test_access_key_id\n" \
-        "    S3SecretAccessKey        test_secret_key\n"    \
+        "    Hostname                 s3_hostname\n"        \
+        "    Bucket                   s3.bucket\n"          \
+        "    AccessKeyId              test_access_key_id\n" \
+        "    SecretAccessKey          test_secret_key\n"    \
         "    TransferProtocol         https\n"              \
+        "    OperationRetries         5\n"                  \
         "</S3RemoteStore>\n";
 
 static int create_test_conf_file() {
@@ -105,9 +106,10 @@ int test_conf(char *err_msg) {
             conf->move_out_stop_rate != 0.7 ||
             conf->out_q_max_size != 9999 ||
             conf->in_q_max_size != 1111 ||
+            conf->s3_operation_retries != 5 ||
             log->type != e_simple
         ) {
-                strcpy(err_msg, "configuratition contains incorrect values");
+                strcpy(err_msg, "configuration contains incorrect values");
                 return -1;
         }
 

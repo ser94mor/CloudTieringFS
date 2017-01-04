@@ -357,7 +357,6 @@ typedef struct {
         size_t out_q_max_size;                /* maximum size of out queue */
         size_t in_q_max_size;                 /* maximum size of in queue */
         size_t path_max;                      /* maximum path length in fs_mount_point directory can not be lower than this value */
-        ops_t  ops;                           /* operation (depends on remote store protocol) */
 
         /* 63 it is unlikely that protocol identifies require more symbols */
         char   remote_store_protocol[64];
@@ -376,6 +375,9 @@ typedef struct {
 
         /* 127 is an assumption that in practice longer keys do not exist */
         char   s3_secret_access_key[128];     /* s3 secret access key */
+
+        /* maximum number of retries of s3 requests */
+        int s3_operation_retries;
 } conf_t;
 
 int read_conf(const char *conf_path);

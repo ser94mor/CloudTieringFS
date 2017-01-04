@@ -36,13 +36,13 @@ s3_response_properties_callback(const S3ResponseProperties *properties, void *ca
         return S3StatusOK;
 }
 
-enum s3_cb_type {
-        s3_cb_GET_OBJECT,
+enum s3_cb_enum {
+        e_s3_cb_get_object,
 };
 
 /* used as in and out a parameter for s3_response_complete_callback() */
 struct s3_cb_data {
-        enum s3_cb_type type; /* method identifier */
+        enum s3_cb_enum type; /* method identifier */
         S3Status status; /* request status */
         char error_details[4096];
         void *data; /* some data */
@@ -122,7 +122,7 @@ FILE *fopen(const char *filename, const char *mode) {
                         int retries = 5;
 
                         struct s3_cb_data callback_data = {
-                                .type = s3_cb_GET_OBJECT,
+                                .type = e_s3_cb_get_object,
                         };
 
                         S3GetObjectHandler getObjectHandler = {
