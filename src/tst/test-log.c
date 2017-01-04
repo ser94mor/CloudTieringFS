@@ -1,6 +1,24 @@
+/**
+ * Copyright (C) 2016, 2017  Sergey Morozov <sergey94morozov@gmail.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #include <string.h>
 #include <signal.h>
 #include <setjmp.h>
+#include <stdio.h>
 
 #include "cloudtiering.h"
 
@@ -16,8 +34,8 @@ static void sigsegv_handler(int signo) {
 int test_log(char *err_msg) {
         /* this test should be execute after test_conf where
            conf_t and log_t structures will be initialized */
-        if (getconf() == NULL) {
-                strcpy(err_msg, "configuration was not initialized (getconf() returned NULL)");
+        if (get_conf() == NULL) {
+                strcpy(err_msg, "configuration was not initialized (get_conf() returned NULL)");
                 return -1;
         }
 

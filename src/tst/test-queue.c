@@ -1,3 +1,20 @@
+/**
+ * Copyright (C) 2016, 2017  Sergey Morozov <sergey94morozov@gmail.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -25,7 +42,7 @@ static int queue_print(FILE *stream, queue_t *queue) {
 
         char *q_ptr = queue->head;
 
-        char buf[queue->max_item_size + 1];
+        char buf[queue->data_max_size + 1];
 
         /* header */
         fprintf(stream, "QUEUE:\n");
@@ -35,19 +52,19 @@ static int queue_print(FILE *stream, queue_t *queue) {
                         "\t< max. queue size : %zu >\n"\
                         "\t< max. item  size : %zu >\n"\
                         "\t< queue buf. size : %zu >\n",
-                queue->cur_q_size, queue->max_q_size,
-                queue->max_item_size, queue->buffer_size);
+                queue->cur_size, queue->max_size,
+                queue->data_max_size, queue->buf_size);
 
         /* data */
-        size_t sz = queue->cur_q_size;
+        size_t sz = queue->cur_size;
         while (sz != 0) {
-                if (q_ptr == (queue->buffer + queue->buffer_size)) {
-                        q_ptr = queue->buffer;
+                if (q_ptr == (queue->buf + queue->buf_size)) {
+                        q_ptr = (char *)queue->buf;
                 }
                 memcpy(buf, q_ptr + sizeof(size_t), (size_t)(*q_ptr));
                 buf[(size_t)(*q_ptr)] = '\0';
                 fprintf(stream, "\t|--> %zu %s \n", (size_t)(*q_ptr), buf);
-                q_ptr += sizeof(size_t) + queue->max_item_size;
+                q_ptr += sizeof(size_t) + queue->data_max_size;
                 --sz;
         }
 
@@ -100,8 +117,11 @@ int test_queue(char *err_msg) {
         }
 
         for (int j = 0; j < QUEUE_MAX_SIZE - 1; j++) {
+                /* NOTE: following queue_front usege is not thread safe */
                 size_t it_sz = 0;
-                char *it = queue_front(queue, &it_sz);
+                queue_front(queue, NULL, &it_sz);
+                char it[it_sz];
+                queue_front(queue, it, &it_sz);
 
                 if (strcmp(item[j], it) || it_sz != (strlen(item[j]) + 1)) {
                         strcpy(err_msg, "'queue_front' failed; wrong return result");
@@ -142,8 +162,11 @@ int test_queue(char *err_msg) {
         }
 
         for (i = 0; i < QUEUE_MAX_SIZE - 1; i++) {
+                /* NOTE: following queue_front usege is not thread safe */
                 size_t it_sz = 0;
-                char *it = queue_front(queue, &it_sz);
+                queue_front(queue, NULL, &it_sz);
+                char it[it_sz];
+                queue_front(queue, it, &it_sz);
 
                 if (strcmp(item[j], it) || it_sz != (strlen(item[j]) + 1)) {
                         strcpy(err_msg, "'queue_front' failed; wrong return result");
@@ -182,7 +205,7 @@ int test_queue(char *err_msg) {
         return 0;
 
 err:
-        stream = fopen("./validate/test-queue.dump", "w");
+        stream = fopen("./test-queue.dump", "w");
         if (!stream) {
                 return -1;
         }

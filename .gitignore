@@ -1,3 +1,4 @@
 *.autosave
 *.kdev4
+*.kate-swp
 bin/

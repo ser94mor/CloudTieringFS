@@ -1,20 +1,26 @@
-#define _XOPEN_SOURCE 500    /* needed to use nftw() */
+#define _XOPEN_SOURCE      500        /* needed to use nftw() */
+#define _POSIX_C_SOURCE    200112L    /* required for rlimit */
 
-#include <unistd.h>
-#include <string.h>
-#include <ftw.h>
+#include <sys/types.h>
 #include <sys/stat.h>
+#include <unistd.h>
+#include <ftw.h>
+#include <string.h>
+#include <sys/time.h>
 #include <sys/resource.h>
 
 #include "cloudtiering.h"
 
+/*******************
+ * Scan filesystem *
+ * *****************/
 /* queue might be full and we need to perform several attempts giving a chance
  * for other threads to pop elements from queue */
-#define QUEUE_PUSH_RETRIES              3
+#define QUEUE_PUSH_RETRIES              5
 #define QUEUE_PUSH_ATTEMPT_SLEEP_SEC    1
 
-static const queue_t *in_queue  = NULL;
-static const queue_t *out_queue = NULL;
+static queue_t *in_queue  = NULL;
+static queue_t *out_queue = NULL;
 
 static int update_evict_queue(const char *fpath, const struct stat *sb,  int typeflag, struct FTW *ftwbuf) {
         int attempt = 0;
@@ -24,24 +30,24 @@ static int update_evict_queue(const char *fpath, const struct stat *sb,  int typ
                 return 0; /* just continue with the next files; non-zero will cause failure of nftw() */
         }
 
-        if (S_ISREG(path_stat.st_mode)) {
+        if (S_ISREG(path_stat.st_mode) &&
+                is_file_local(fpath) &&
+                (path_stat.st_atime + 600) < time(NULL)) {
                 do {
-                        if (queue_push((queue_t *)out_queue, (char *)fpath, strlen(fpath) + 1) == -1) {
+                        if (queue_push(out_queue, (char *)fpath, strlen(fpath) + 1) == -1) {
                                 ++attempt;
-                                LOG(DEBUG, "failed to push file name '%s' to out queue (attempt %d/%d)",
-                                    fpath, attempt, QUEUE_PUSH_RETRIES);
                                 continue;
                         }
                         LOG(DEBUG, "file '%s' pushed to out queue", fpath);
                         break;
                 } while ((attempt < QUEUE_PUSH_RETRIES) && (queue_full((queue_t *)out_queue) > 0));
-        }
+                }
 
-        return 0;
+                return 0;
 }
 
 int scanfs(queue_t *in_q, queue_t *out_q) {
-        conf_t *conf = getconf();
+        conf_t *conf = get_conf();
 
         in_queue  = in_q;
         out_queue = out_q;

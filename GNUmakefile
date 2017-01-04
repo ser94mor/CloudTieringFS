@@ -1,3 +1,20 @@
+################################################################################
+#  Copyright (C) 2016, 2017  Sergey Morozov <sergey94morozov@gmail.com>        #
+#                                                                              #
+#  This program is free software: you can redistribute it and/or modify        #
+#  it under the terms of the GNU General Public License as published by        #
+#  the Free Software Foundation, either version 3 of the License, or           #
+#  (at your option) any later version.                                         #
+#                                                                              #
+#  This program is distributed in the hope that it will be useful,             #
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of              #
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the               #
+#  GNU General Public License for more details.                                #
+#                                                                              #
+#  You should have received a copy of the GNU General Public License           #
+#  along with this program.  If not, see <http://www.gnu.org/licenses/>.       #
+################################################################################
+
 #
 # Single makefile to build all components of cloudtiering.
 #
@@ -5,16 +22,17 @@
 
 ### versions
 MAJOR_VER ::= 0
-MINOR_VER ::= 1
+MINOR_VER ::= 2
 PATCH_VER ::= 0
 VERSION   ::= ${MAJOR_VER}.${MINOR_VER}.${PATCH_VER}
 
 
 ### names
-APP_NAME   ::= cloudtiering-monitor
-LIB_SONAME ::= libcloudtiering.so
+NAME       ::= cloudtiering
+APP_NAME   ::= ${NAME}-daemon
+LIB_SONAME ::= lib${NAME}.so
 LIB_NAME   ::= ${LIB_SONAME}.${VERSION}
-TST_NAME   ::= cloudtiering-test
+TST_NAME   ::= ${NAME}-test
 
 
 ### directories
@@ -45,7 +63,7 @@ all: lib app tst validate
 
 
 lib: mkdir-${BIN_DIR}/${LIB_SUBDIR} ${LIB_OBJ}
-	gcc -pthread -shared -Wl,-soname,${LIB_SONAME} ${LIB_OBJ} -o ${BIN_DIR}/${LIB_NAME} -ldotconf -ldl
+	gcc -pthread -shared -Wl,-soname,${LIB_SONAME} ${LIB_OBJ} -o ${BIN_DIR}/${LIB_NAME} -ldotconf -ls3 -ldl
 	ln --symbolic --force ${LIB_NAME} ${BIN_DIR}/${LIB_SONAME}
 
 
@@ -57,9 +75,9 @@ tst: mkdir-${BIN_DIR}/${TST_SUBDIR} lib ${TST_OBJ}
 	gcc -pthread ${TST_OBJ} -o ${BIN_DIR}/${TST_NAME} -L${BIN_DIR} -l:${LIB_NAME}
 
 
-validate: lib app tst
-	@pushd ${BIN_DIR} 1>/dev/null && \
-	LD_LIBRARY_PATH=. ./${TST_NAME} && \
+validate: lib app tst mkdir-${BIN_DIR}/validate
+	@pushd ${BIN_DIR}/validate 1>/dev/null && \
+	LD_LIBRARY_PATH=../ ../${TST_NAME} && \
 	popd 1>/dev/null
 
 

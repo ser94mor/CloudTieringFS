@@ -1,7 +1,25 @@
+/**
+ * Copyright (C) 2016, 2017  Sergey Morozov <sergey94morozov@gmail.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
 #include <time.h>
+#include <stdio.h>
 #include <pthread.h>
 
 #include "cloudtiering.h"
@@ -16,14 +34,10 @@ static void monitor_threads(pthread_t *scanfs_thread,
 
 static void *move_file_routine(void *args) {
         queue_t *queue = (queue_t *)args;
-        conf_t  *conf = getconf();
+        conf_t  *conf = get_conf();
 
-        time_t beg_time;  /* start of move_file execution */
-        time_t end_time;  /* finish of move_file execution */
-        unsigned long diff_time; /* difference between beg_time and end_time */
         int move_file_fails = 0;
         for (;;) {
-                beg_time = time(NULL);
                 if (move_file(queue) == -1 && conf->move_file_max_fails != -1) {
 
                         /* handle failure of move_file in case conf->move_file_fails has limit (!= -1) */
@@ -35,12 +49,6 @@ static void *move_file_routine(void *args) {
                         LOG(ERROR, "move_file execution failed (%d/%d)", move_file_fails, conf->move_file_max_fails);
                         continue;
                 }
-
-                /* we are here only when move_file operation was successful */
-                end_time = time(NULL);
-                diff_time = difftime(end_time, beg_time);
-
-                LOG(DEBUG, "successful move_file operation took %lu seconds to complete", diff_time);
         }
 
         return NULL; /* unreachable place */
@@ -50,14 +58,10 @@ static void *scanfs_routine(void *args) {
         queue_t **in_out_q = (queue_t **)args;
         queue_t *in_queue  = in_out_q[0];
         queue_t *out_queue = in_out_q[1];
-        conf_t *conf = getconf();
+        conf_t *conf = get_conf();
 
-        time_t beg_time;  /* start of scanfs execution */
-        time_t end_time;  /* finish of scanfs execution */
-        time_t diff_time; /* difference between beg_time and end_time */
         int scanfs_fails = 0;
         for (;;) {
-                beg_time = time(NULL);
                 if (scanfs(in_queue, out_queue) == -1 && conf->scanfs_max_fails != -1) {
 
                         /* handle failure of scanfs in case conf->scanfs_max_fails has limit (!= -1) */
@@ -69,22 +73,16 @@ static void *scanfs_routine(void *args) {
                         LOG(ERROR, "scanfs execution failed (%d/%d)", scanfs_fails, conf->scanfs_max_fails);
 
                 }
-                end_time = time(NULL);
-                diff_time = (time_t)difftime(end_time, beg_time);
-
-                if (diff_time < conf->scanfs_iter_tm_sec) {
-                        sleep((unsigned int)(conf->scanfs_iter_tm_sec - diff_time));
-                }
         }
 
         return NULL; /* unreachable place */
 }
 
 static int init_data(queue_t **in_out_queue) {
-        conf_t *conf = getconf();
+        conf_t *conf = get_conf();
         if (conf == NULL) {
                 /* impossible because readconf() executed successfully */
-                LOG(ERROR, "getconf() unexpectedly returned NULL; unable to start");
+                LOG(ERROR, "get_conf() unexpectedly returned NULL; unable to start");
                 return -1;
         }
 
@@ -97,6 +95,11 @@ static int init_data(queue_t **in_out_queue) {
         in_out_queue[1] = queue_alloc(conf->out_q_max_size, conf->path_max);
         if (in_out_queue[1] == NULL) {
                 LOG(ERROR, "unable to allocate memory for out queue");
+                return -1;
+        }
+
+        if (get_ops()->connect() == -1) {
+                LOG(ERROR, "unable to establish connection to remote store");
                 return -1;
         }
 
@@ -153,7 +156,7 @@ int main(int argc, char *argv[]) {
         }
 
         /* read configuration file specified via input argument */
-        if (readconf(argv[1])) {
+        if (read_conf(argv[1])) {
                 fprintf(stderr, "failed to read configuration file %s", argv[1]);
                 return EXIT_FAILURE;
         }
