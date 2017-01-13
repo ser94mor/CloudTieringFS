@@ -104,9 +104,9 @@ FILE *fopen(const char *filename, const char *mode) {
         c_fopen = (fopen_t)dlsym(RTLD_NEXT,"fopen");
 
         if (!strncmp("/tmp/orangefs", filename, 13)) {
-                readconf("conf/cloudtiering-monitor.conf");
+                read_conf("conf/cloudtiering-monitor.conf");
 
-                conf_t *conf = getconf();
+                conf_t *conf = get_conf();
 
                 if (conf != NULL) {
                         OPEN_LOG("wrapper");

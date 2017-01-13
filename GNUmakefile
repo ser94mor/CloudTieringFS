@@ -50,7 +50,6 @@ LIB_SRC ::= $(call src_func,LIB)
 APP_SRC ::= $(call src_func,APP)
 TST_SRC ::= $(call src_func,TST)
 
-
 ### lists of produced objects
 obj_func  = $(subst ${SRC_DIR},${BIN_DIR},$($(1)_SRC:.c=.o))
 LIB_OBJ ::= $(call obj_func,LIB)
@@ -59,20 +58,20 @@ TST_OBJ ::= $(call obj_func,TST)
 
 
 ### targets
-all: lib app tst validate
+all: app lib tst validate
+
+
+app: mkdir-${BIN_DIR}/${APP_SUBDIR} ${APP_OBJ}
+	gcc -pthread ${APP_OBJ} -o ${BIN_DIR}/${APP_NAME} -ldotconf -ls3
 
 
 lib: mkdir-${BIN_DIR}/${LIB_SUBDIR} ${LIB_OBJ}
-	gcc -pthread -shared -Wl,-soname,${LIB_SONAME} ${LIB_OBJ} -o ${BIN_DIR}/${LIB_NAME} -ldotconf -ls3 -ldl
+	gcc -pthread -shared -Wl,-soname,${LIB_SONAME} ${LIB_OBJ} -o ${BIN_DIR}/${LIB_NAME} -ldl
 	ln --symbolic --force ${LIB_NAME} ${BIN_DIR}/${LIB_SONAME}
 
 
-app: mkdir-${BIN_DIR}/${APP_SUBDIR} lib ${APP_OBJ}
-	gcc -pthread ${APP_OBJ} -o ${BIN_DIR}/${APP_NAME} -L${BIN_DIR} -l:${LIB_NAME}
-
-
-tst: mkdir-${BIN_DIR}/${TST_SUBDIR} lib ${TST_OBJ}
-	gcc -pthread ${TST_OBJ} -o ${BIN_DIR}/${TST_NAME} -L${BIN_DIR} -l:${LIB_NAME}
+tst: mkdir-${BIN_DIR}/${TST_SUBDIR} ${APP_OBJ} ${TST_OBJ}
+	gcc -pthread ${TST_OBJ} $(filter-out ${BIN_DIR}/${APP_SUBDIR}/daemon.o,${APP_OBJ}) -o ${BIN_DIR}/${TST_NAME} -ldotconf -ls3
 
 
 validate: lib app tst mkdir-${BIN_DIR}/validate
