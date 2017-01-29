@@ -33,12 +33,12 @@ static void monitor_threads(pthread_t *scanfs_thread,
 
 
 static void *move_file_routine(void *args) {
-        queue_t *queue = (queue_t *)args;
+        struct queue_tuple *qtuple = (struct queue_tuple *)args;
         conf_t  *conf = get_conf();
 
         int move_file_fails = 0;
         for (;;) {
-                if (move_file(queue) == -1 && conf->move_file_max_fails != -1) {
+                if (move_file(qtuple) == -1 && conf->move_file_max_fails != -1) {
 
                         /* handle failure of move_file in case conf->move_file_fails has limit (!= -1) */
                         ++move_file_fails;
@@ -55,14 +55,14 @@ static void *move_file_routine(void *args) {
 }
 
 static void *scanfs_routine(void *args) {
-        queue_t **in_out_q = (queue_t **)args;
-        queue_t *in_queue  = in_out_q[0];
-        queue_t *out_queue = in_out_q[1];
+        struct queue_tuple *queue_tuple = (struct queue_tuple *)args;
         conf_t *conf = get_conf();
 
         int scanfs_fails = 0;
         for (;;) {
-                if (scanfs(in_queue, out_queue) == -1 && conf->scanfs_max_fails != -1) {
+                if (scanfs(queue_tuple->download_queue,
+                           queue_tuple->upload_queue) == -1 &&
+                    conf->scanfs_max_fails != -1) {
 
                         /* handle failure of scanfs in case conf->scanfs_max_fails has limit (!= -1) */
                         ++scanfs_fails;
@@ -78,7 +78,7 @@ static void *scanfs_routine(void *args) {
         return NULL; /* unreachable place */
 }
 
-static int init_data(queue_t **in_out_queue) {
+static int init_data(struct queue_tuple *qtuple) {
         conf_t *conf = get_conf();
         if (conf == NULL) {
                 /* impossible because readconf() executed successfully */
@@ -86,15 +86,20 @@ static int init_data(queue_t **in_out_queue) {
                 return -1;
         }
 
-        in_out_queue[0] = queue_alloc(conf->in_q_max_size, conf->path_max);
-        if (in_out_queue[0] == NULL) {
-                LOG(ERROR, "unable to allocate memory for in queue");
+        qtuple->upload_queue = QUEUE_ALLOC(qtuple->upload_queue,
+                                           conf->in_q_max_size,
+                                           conf->path_max);
+
+        if (qtuple->upload_queue == NULL) {
+                LOG(ERROR, "unable to allocate memory for upload queue");
                 return -1;
         }
 
-        in_out_queue[1] = queue_alloc(conf->out_q_max_size, conf->path_max);
-        if (in_out_queue[1] == NULL) {
-                LOG(ERROR, "unable to allocate memory for out queue");
+        qtuple->download_queue = QUEUE_ALLOC(qtuple->download_queue,
+                                             conf->in_q_max_size,
+                                             conf->path_max);
+        if (qtuple->download_queue == NULL) {
+                LOG(ERROR, "unable to allocate memory for download queue");
                 return -1;
         }
 
@@ -106,30 +111,47 @@ static int init_data(queue_t **in_out_queue) {
         return 0;
 }
 
-static int start_routines(queue_t **in_out_queue,
+static int start_routines(struct queue_tuple *qtuple,
                           pthread_t *scanfs_thread,
                           pthread_t *move_file_in_thread,
                           pthread_t *move_file_out_thread) {
         int ret;
 
-        ret = pthread_create(scanfs_thread, NULL, scanfs_routine, (void *)in_out_queue);
+        ret = pthread_create(scanfs_thread,
+                             NULL,
+                             scanfs_routine,
+                             qtuple);
         if (ret != 0) {
                 /* ret is errno in this case */
-                LOG(ERROR, "pthread_create for scanfs_routine failed: %s", strerror(ret));
+                LOG(ERROR,
+                    "pthread_create for scanfs_routine failed: %s",
+                    strerror(ret));
                 return -1;
         }
 
-        ret = pthread_create(move_file_in_thread, NULL, move_file_routine, (void *)in_out_queue[0]);
+        ret = pthread_create(move_file_in_thread,
+                             NULL,
+                             move_file_routine,
+                             qtuple);
         if (ret != 0) {
                 /* ret is errno in this case */
-                LOG(ERROR, "pthread_create for move_file_routine (in queue) failed: %s", strerror(ret));
+                LOG(ERROR,
+                    "pthread_create for move_file_routine (download queue) "
+                    "failed: %s",
+                    strerror(ret));
                 return -1;
         }
 
-        ret = pthread_create(move_file_out_thread, NULL, move_file_routine, (void *)in_out_queue[1]);
+        ret = pthread_create(move_file_out_thread,
+                             NULL,
+                             move_file_routine,
+                             qtuple);
         if (ret != 0) {
                 /* ret is errno in this case */
-                LOG(ERROR, "pthread_create for move_file_routine (out queue) failed: %s", strerror(ret));
+                LOG(ERROR,
+                    "pthread_create for move_file_routine (upload queue) "
+                    "failed: %s",
+                    strerror(ret));
                 return -1;
         }
 
@@ -137,8 +159,7 @@ static int start_routines(queue_t **in_out_queue,
 }
 
 int main(int argc, char *argv[]) {
-        /* array containing in queue as a first element and out queue as a second element */
-        queue_t *in_out_queue[2];
+        struct queue_tuple qtuple;
 
         /* thread that should scan file system and add elements to in and out queues */
         pthread_t scanfs_thread;
@@ -165,12 +186,15 @@ int main(int argc, char *argv[]) {
         OPEN_LOG(argv[0]);
 
         /* initialize variables that will be used in whole program */
-        if (init_data(in_out_queue) == -1) {
+        if (init_data(&qtuple) == -1) {
                 return EXIT_FAILURE;
         }
 
         /* start all routines composing business logic of this program */
-        if (start_routines(in_out_queue, &scanfs_thread, &move_file_in_thread, &move_file_out_thread)) {
+        if (start_routines(&qtuple,
+                           &scanfs_thread,
+                           &move_file_in_thread,
+                           &move_file_out_thread)) {
                 return EXIT_FAILURE;
         }
 

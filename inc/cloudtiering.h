@@ -220,18 +220,73 @@ typedef struct {
         size_t buf_size;
 
         /* a mutex to ensure a thread-safety property */
-        pthread_mutex_t mutex;
+        pthread_mutex_t head_mutex;
+
+        pthread_mutex_t tail_mutex;
+
+        pthread_mutex_t size_mutex;
+
+        pthread_cond_t fullness_cond;
+
+        pthread_cond_t emptiness_cond;
 } queue_t;
 
-/* functions to work with queue data structure */
-queue_t *queue_alloc(size_t queue_max_size, size_t data_max_size);
-void     queue_free(queue_t *queue);
-int      queue_empty(queue_t *queue);
-int      queue_full(queue_t *queue);
+/* functions to work with queue_t data structure */
+queue_t *queue_init(size_t queue_max_size, size_t data_max_size);
+void     queue_destroy(queue_t *queue);
 int      queue_push(queue_t *queue, const char *data, size_t data_size);
+int      queue_try_push(queue_t *queue, const char *data, size_t data_size);
 int      queue_pop(queue_t *queue);
-int      queue_front(queue_t *queue, char *data, size_t *data_size);
 
+
+
+typedef struct {
+        const queue_t *primary_queue;
+
+        const queue_t *secondary_queue;
+
+        /* a mutex to ensure a thread-safety property */
+        pthread_mutex_t mutex;
+} pqueue_t;
+
+enum data_priority_enum {
+        primary_e,
+        secondary_e,
+};
+
+/* functions to work with priority queue data structure */
+pqueue_t *pqueue_alloc(size_t queue_max_size,
+                       size_t data_max_size);
+void      pqueue_free(pqueue_t *queue);
+int       pqueue_enqueue(pqueue_t* pqueue, const char* data, size_t data_size, data_priority_enum data_type);
+int       pqueue_dequeue(pqueue_t *queue,
+                         char *data,
+                         size_t *data_size);
+
+#define QUEUE_ALLOC(queue, args...) \
+        _Generic((queue), queue_t *: queue_alloc, \
+                          pqueue_t *: pqueue_alloc)( args )
+
+#define QUEUE_FREE(queue) \
+        _Generic((queue), queue_t *: queue_free, \
+                          pqueue_t *: pqueue_free)( args )
+
+#define QUEUE_PUSH(queue, args...) \
+        _Generic((queue), queue_t *: queue_push, \
+                          pqueue_t *:  pqueue_push)(queue, ##args)
+
+#define QUEUE_FRONT(queue, args...) \
+        _Generic((queue), queue_t *: queue_front, \
+                          pqueue_t *:  pqueue_front)(queue, ##args)
+
+#define QUEUE_POP(queue) \
+        _Generic((queue), queue_t *: queue_pop, \
+                          pqueue_t *:  pqueue_pop)(queue)\
+
+struct queue_tuple {
+        queue_t  *upload_queue;
+        pqueue_t *download_queue;
+};
 
 /*******************************************************************************
 * CONFIGURATION                                                                *

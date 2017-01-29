@@ -20,6 +20,9 @@
 #
 
 
+### compiler
+GCC ::= gcc-5
+
 ### versions
 MAJOR_VER ::= 0
 MINOR_VER ::= 2
@@ -62,16 +65,16 @@ all: app lib tst validate
 
 
 app: mkdir-${BIN_DIR}/${APP_SUBDIR} ${APP_OBJ}
-	gcc -pthread ${APP_OBJ} -o ${BIN_DIR}/${APP_NAME} -ldotconf -ls3
+	${GCC} -pthread ${APP_OBJ} -o ${BIN_DIR}/${APP_NAME} -ldotconf -ls3
 
 
 lib: mkdir-${BIN_DIR}/${LIB_SUBDIR} ${LIB_OBJ}
-	gcc -pthread -shared -Wl,-soname,${LIB_SONAME} ${LIB_OBJ} -o ${BIN_DIR}/${LIB_NAME} -ldl
+	${GCC} -pthread -shared -Wl,-soname,${LIB_SONAME} ${LIB_OBJ} -o ${BIN_DIR}/${LIB_NAME} -ldl
 	ln --symbolic --force ${LIB_NAME} ${BIN_DIR}/${LIB_SONAME}
 
 
 tst: mkdir-${BIN_DIR}/${TST_SUBDIR} ${APP_OBJ} ${TST_OBJ}
-	gcc -pthread ${TST_OBJ} $(filter-out ${BIN_DIR}/${APP_SUBDIR}/daemon.o,${APP_OBJ}) -o ${BIN_DIR}/${TST_NAME} -ldotconf -ls3
+	${GCC} -pthread ${TST_OBJ} $(filter-out ${BIN_DIR}/${APP_SUBDIR}/daemon.o,${APP_OBJ}) -o ${BIN_DIR}/${TST_NAME} -ldotconf -ls3
 
 
 validate: lib app tst mkdir-${BIN_DIR}/validate
@@ -81,14 +84,14 @@ validate: lib app tst mkdir-${BIN_DIR}/validate
 
 
 ${BIN_DIR}/${LIB_SUBDIR}/%.o: ${SRC_DIR}/${LIB_SUBDIR}/%.c
-	gcc -pthread -fPIC -g -c -Wall -std=c11 $(addprefix -I,${INC_DIR}) -o $@ $<
+	${GCC} -pthread -fPIC -g -c -Wall -std=c11 $(addprefix -I,${INC_DIR}) -o $@ $<
 
 ${BIN_DIR}/${APP_SUBDIR}/%.o: ${SRC_DIR}/${APP_SUBDIR}/%.c
-	gcc -pthread -g -Wall -std=c11 $(addprefix -I,${INC_DIR}) -c $< -o $@
+	${GCC} -pthread -g -Wall -std=c11 $(addprefix -I,${INC_DIR}) -c $< -o $@
 
 
 ${BIN_DIR}/${TST_SUBDIR}/%.o: ${SRC_DIR}/${TST_SUBDIR}/%.c
-	gcc -pthread -g -Wall -std=c11 $(addprefix -I,${INC_DIR}) -c $< -o $@
+	${GCC} -pthread -g -Wall -std=c11 $(addprefix -I,${INC_DIR}) -c $< -o $@
 
 
 mkdir-${BIN_DIR}/%:
