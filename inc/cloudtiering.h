@@ -232,11 +232,14 @@ typedef struct {
 } queue_t;
 
 /* functions to work with queue_t data structure */
-queue_t *queue_init(size_t queue_max_size, size_t data_max_size);
-void     queue_destroy(queue_t *queue);
-int      queue_push(queue_t *queue, const char *data, size_t data_size);
-int      queue_try_push(queue_t *queue, const char *data, size_t data_size);
-int      queue_pop(queue_t *queue);
+int  queue_init(queue_t **queue_p, size_t queue_max_size, size_t data_max_size);
+void queue_destroy(queue_t *queue);
+
+int  queue_push(queue_t *queue, const char *data, size_t data_size);
+int  queue_try_push(queue_t *queue, const char *data, size_t data_size);
+
+int  queue_pop(queue_t *queue, char *data, size_t *data_size);
+int  queue_try_pop(queue_t *queue, char *data, size_t *data_size);
 
 
 
@@ -250,15 +253,15 @@ typedef struct {
 } pqueue_t;
 
 enum data_priority_enum {
-        primary_e,
-        secondary_e,
+        e_primary,
+        e_secondary,
 };
 
 /* functions to work with priority queue data structure */
 pqueue_t *pqueue_alloc(size_t queue_max_size,
                        size_t data_max_size);
 void      pqueue_free(pqueue_t *queue);
-int       pqueue_enqueue(pqueue_t* pqueue, const char* data, size_t data_size, data_priority_enum data_type);
+int       pqueue_enqueue(pqueue_t* pqueue, const char* data, size_t data_size, enum data_priority_enum data_type);
 int       pqueue_dequeue(pqueue_t *queue,
                          char *data,
                          size_t *data_size);

@@ -184,6 +184,12 @@ static DOTCONF_CB(operation_retries_cb) {
         return NULL;
 }
 
+static DOTCONF_CB(path_max_cb) {
+        /* conf_t structure contains path_max value including '\0' character */
+        conf->path_max = ((size_t)cmd->data.value) + 1;
+        return NULL;
+}
+
 
 /*******************************************************************************
 * Dotconf's options' definitions.                                              *
@@ -194,6 +200,7 @@ static const configoption_t options[] = {
         { "FsMountPoint",                ARG_STR,    fs_mount_point_cb,            NULL, SECTION_CTX(General)       },
         { "LoggingFramework",            ARG_STR,    logger_cb,                    NULL, SECTION_CTX(General)       },
         { "RemoteStoreProtocol",         ARG_STR,    remote_store_protocol_cb,     NULL, SECTION_CTX(General)       },
+        { "PathMax",                     ARG_INT,    path_max_cb,                  NULL, SECTION_CTX(General)       },
         { end_General_section_str,       ARG_NONE,   end_General_section_cb,       NULL, CTX_ALL                    },
 
         /* Internal section */
@@ -255,29 +262,6 @@ inline ops_t *get_ops() {
 
 
 /**
- * @brief init_dependent_members Initialize remaining members of configuration.
- *
- * @return  0: when all system calls were successful
- *         -1: when at least one system call has failed
- */
-static int init_dependent_members(void) {
-        /* pathconf will not change errno and will return -1 if requested
-           resource does not have limit */
-        errno = 0;
-        ssize_t path_max = pathconf(conf->fs_mount_point, _PC_PATH_MAX);
-        if ((path_max == -1) && !errno) {
-                path_max = PATH_MAX;
-        } else if (path_max == -1) {
-                return -1;
-        }
-
-        conf->path_max = path_max;
-
-        return 0;
-}
-
-
-/**
  * @brief read_conf Read configuration from file.
  *
  * @note Does not handle the case when line length exceeded LINE_MAX limit.
@@ -317,10 +301,6 @@ int read_conf(const char *conf_path) {
         }
 
         dotconf_cleanup(configfile);
-
-        if (init_dependent_members()) {
-                return -1;
-        }
 
         return 0;
 }

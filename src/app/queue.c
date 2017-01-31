@@ -20,9 +20,6 @@
 #include <string.h>
 #include <pthread.h>
 #include <sys/types.h>
-#include <apr-1/apu.h>
-#include <apr-1/apr_errno.h>
-#include <apr-1/apr_pools.h>
 
 #include "cloudtiering.h"
 
@@ -84,7 +81,10 @@ static inline char *queue_elem_data(const char *elem) {
         return ((char *)elem + sizeof(size_t));
 }
 
-int queue_push(queue_t *queue, const char *data, size_t data_size) {
+static int queue_push_common(queue_t *queue,
+                             const char *data,
+                             size_t data_size,
+                             int should_wait) {
         /* check an input parameters' correctness */
         if (queue == NULL || data == NULL || data_size == 0 ||
             data_size > queue->data_max_size) {
@@ -96,6 +96,11 @@ int queue_push(queue_t *queue, const char *data, size_t data_size) {
         pthread_mutex_lock(&queue->size_mutex);
 
         while(queue->cur_size == queue->max_size) {
+                if (!should_wait) {
+                        pthread_mutex_unlock(&queue->size_mutex);
+                        pthread_mutex_unlock(&queue->tail_mutex);
+                        return -1;
+                }
                 pthread_cond_wait(&queue->fullness_cond, &queue->size_mutex);
         }
 
@@ -116,7 +121,7 @@ int queue_push(queue_t *queue, const char *data, size_t data_size) {
         pthread_mutex_lock(&queue->size_mutex);
 
         if (queue->cur_size++ == 0) {
-                pthread_cond_signal(&queue->emptiness_cond);
+                pthread_cond_broadcast(&queue->emptiness_cond);
         }
 
         pthread_mutex_unlock(&queue->size_mutex);
@@ -125,9 +130,20 @@ int queue_push(queue_t *queue, const char *data, size_t data_size) {
         return 0;
 }
 
-int queue_pop(queue_t *queue, char *data, size_t *data_size) {
+int queue_push(queue_t *queue, const char *data, size_t data_size) {
+        return queue_push_common(queue, data, data_size, 1);
+}
+
+int queue_try_push(queue_t *queue, const char *data, size_t data_size) {
+        return queue_push_common(queue, data, data_size, 0);
+}
+
+static int queue_pop_common(queue_t *queue,
+                            char *data,
+                            size_t *data_size,
+                            int should_wait) {
         /* check an input parameters' correctness; a data can be NULL */
-        if (queue == NULL || data_size == NULL) {
+        if (queue == NULL || data == NULL || data_size == NULL) {
                 return -1;
         }
 
@@ -136,6 +152,11 @@ int queue_pop(queue_t *queue, char *data, size_t *data_size) {
         pthread_mutex_lock(&queue->size_mutex);
 
         while(queue->cur_size == 0) {
+                if (!should_wait) {
+                        pthread_mutex_unlock(&queue->size_mutex);
+                        pthread_mutex_unlock(&queue->head_mutex);
+                        return -1;
+                }
                 pthread_cond_wait(&queue->emptiness_cond, &queue->size_mutex);
         }
 
@@ -152,10 +173,8 @@ int queue_pop(queue_t *queue, char *data, size_t *data_size) {
         /* set a value of the data's size */
         *data_size = elem_sz;
 
-        /* set data only in case a buffer for data provided */
-        if (data != NULL) {
-                memcpy(data, queue_elem_data(queue->head), *data_size);
-        }
+        /* copy data to provided buffer */
+        memcpy(data, queue_elem_data(queue->head), *data_size);
 
         /* a begining and an end of a buffer are logically identical;
            update the queue's internal state */
@@ -167,13 +186,27 @@ int queue_pop(queue_t *queue, char *data, size_t *data_size) {
         pthread_mutex_lock(&queue->size_mutex);
 
         if (queue->cur_size-- == queue->max_size) {
-                pthread_cond_signal(&queue->fullness_cond);
+                pthread_cond_broadcast(&queue->fullness_cond);
         }
 
         pthread_mutex_unlock(&queue->size_mutex);
         pthread_mutex_unlock(&queue->head_mutex);
 
         return 0;
+}
+
+int queue_pop(queue_t *queue,
+              char *data,
+              size_t *data_size) {
+
+        return queue_pop_common(queue, data, data_size, 1);
+}
+
+int queue_try_pop(queue_t *queue,
+                  char *data,
+                  size_t *data_size) {
+
+        return queue_pop_common(queue, data, data_size, 0);
 }
 
 /**

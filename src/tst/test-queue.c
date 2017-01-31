@@ -18,27 +18,47 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
+#include <errno.h>
+#include <pthread.h>
 
 #include "cloudtiering.h"
 
-static char *item[] = {
+#define QUEUE_MAX_SIZE    3
+#define DATA_MAX_SIZE     20
+
+#define ITERATIONS_PER_THREAD    1000000
+#define DATA_STR_THREAD          "data"
+#define DATA_STR_LEN_THREAD      5
+
+static char *data_arr[] = {
                 "Hello, World!",
                 "This is me.",
                 "Let's play a game.",
                 "Don't be so shy.",
-                "Good luck!",
-                "Hello? Hello? C-can you here me? I'm supposed to be too big, to exceed itém limít."
 };
 
-#define QUEUE_MAX_SIZE    3
-#define ITEM_MAX_SIZE     20
+static const char *very_long_data =
+        "Hello? Hello? C-can you here me? I'm supposed to be too big, "
+        "to exceed itém limít.";
+
+/* the following globals are needed for parallel access test */
+static pthread_cond_t  finish_cond  = PTHREAD_COND_INITIALIZER;
+static pthread_mutex_t finish_mutex = PTHREAD_MUTEX_INITIALIZER;
+static int threads_finished = 0;
+
+static pthread_cond_t  start_cond  = PTHREAD_COND_INITIALIZER;
+static pthread_mutex_t start_mutex = PTHREAD_MUTEX_INITIALIZER;
+static int start_flag = 0;
 
 static int queue_print(FILE *stream, queue_t *queue) {
         if (queue == NULL || stream == NULL) {
                 return -1;
         }
 
-        pthread_mutex_lock(&queue->mutex);
+        pthread_mutex_lock(&queue->head_mutex);
+        pthread_mutex_lock(&queue->tail_mutex);
+        pthread_mutex_lock(&queue->size_mutex);
 
         char *q_ptr = queue->head;
 
@@ -70,150 +90,330 @@ static int queue_print(FILE *stream, queue_t *queue) {
 
         fflush(stream);
 
-        pthread_mutex_unlock(&queue->mutex);
+        pthread_mutex_unlock(&queue->size_mutex);
+        pthread_mutex_unlock(&queue->tail_mutex);
+        pthread_mutex_unlock(&queue->head_mutex);
 
         return 0;
 }
 
-/* TODO: add tests where more than 1 thread uses the same queue */
-
-int test_queue(char *err_msg) {
-        FILE *stream;
+static int test_queue_api(char *err_msg, queue_t **queue_p) {
         queue_t *queue = NULL;
+        size_t data_size = DATA_MAX_SIZE;
+        char data[data_size];
 
-        queue = queue_alloc(QUEUE_MAX_SIZE, ITEM_MAX_SIZE);
-        if (queue == NULL) {
-                strcpy(err_msg, "'queue_alloc' failed");
+        if (queue_init(&queue, QUEUE_MAX_SIZE, DATA_MAX_SIZE)) {
+                strcpy(err_msg, "[queue_init] should not fail with correct "
+                                "input args");
                 goto err;
         }
 
-        if (!queue_empty(queue)) {
-                strcpy(err_msg, "'queue_empty' failed; queue should be empty");
-                goto err;
-        }
-
-        int i = 0;
+        int i;
         for (i = 0; i < QUEUE_MAX_SIZE; i++) {
-                if(queue_push(queue, item[i], strlen(item[i]) + 1)) {
-                        strcpy(err_msg, "'queue_push' failed; ordinary case");
+                if (queue_push(queue, data_arr[i], strlen(data_arr[i]) + 1)) {
+                        strcpy(err_msg, "[queue_push] should not fail with "
+                                        "non-full queue");
                         goto err;
                 }
-
-                if (queue_empty(queue)) {
-                        strcpy(err_msg, "'queue_empty' failed; queue should not be empty");
-                        goto err;;
-                }
         }
-        /* here i equals QUEUE_MAX_SIZE */
 
-        if (!queue_full(queue)) {
-                strcpy(err_msg, "'queue_full' failed; queue should be full");
+        /* i == QUEUE_MAX_SIZE here, i.e. index of QUEUE_MAX_SIZE + 1 data */
+        if (!queue_try_push(queue, data_arr[i], strlen(data_arr[i]) + 1)) {
+                strcpy(err_msg, "[queue_try_push] should had failed with full "
+                                "queue but had not");
                 goto err;
         }
 
-        if (!queue_push(queue, item[i], strlen(item[i]) + 1)) {
-                strcpy(err_msg, "'queue_push' failed; queue had to return error");
+        data_size = DATA_MAX_SIZE;
+        if (queue_pop(queue, data, &data_size)) {
+                strcpy(err_msg, "[queue_pop] should not fail with non-empty "
+                                "queue and correct input args");
                 goto err;
         }
 
-        for (int j = 0; j < QUEUE_MAX_SIZE - 1; j++) {
-                /* NOTE: following queue_front usege is not thread safe */
-                size_t it_sz = 0;
-                queue_front(queue, NULL, &it_sz);
-                char it[it_sz];
-                queue_front(queue, it, &it_sz);
+        if (strcmp(data, data_arr[QUEUE_MAX_SIZE - i])) {
+                strcpy(err_msg, "[queue_pop] returned incorrect data");
+                goto err;
+        }
+        --i;
 
-                if (strcmp(item[j], it) || it_sz != (strlen(item[j]) + 1)) {
-                        strcpy(err_msg, "'queue_front' failed; wrong return result");
+        /* i == QUEUE_MAX_SIZE - 1 here, i.e. index of QUEUE_MAX_SIZE data */
+        if (queue_push(queue, data_arr[i], strlen(data_arr[i]) + 1)) {
+                strcpy(err_msg,
+                       "[queue_push] should not fail with non-full "
+                       "queue (inversed order of data items)");
+                goto err;
+        }
+        ++i;
+
+        /* i == QUEUE_MAX_SIZE here, i.e. index of QUEUE_MAX_SIZE + 1 data */
+        if (!queue_try_push(queue, data_arr[i], strlen(data_arr[i]) + 1)) {
+                strcpy(err_msg, "[queue_try_push] should had failed with full "
+                                "queue but had not (inversed order of "
+                                "data items)");
+                goto err;
+        }
+        --i;
+
+        /* buffer inversion here is 1 data item; i == QUEUE_MAX_SIZE - 1 here */
+        for (; i >= 1; i--) {
+                data_size = DATA_MAX_SIZE;
+                if (queue_pop(queue, data, &data_size)) {
+                        strcpy(err_msg,
+                               "[queue_pop] should not fail with non-empty "
+                               "queue and correct input args (normal order of "
+                               "data items)");
                         goto err;
                 }
 
-                if (queue_pop(queue)) {
-                        strcpy(err_msg, "'queue_pop' failed; ordinary case");
+                if (strcmp(data, data_arr[QUEUE_MAX_SIZE - i])) {
+                        strcpy(err_msg, "[queue_pop] returned incorrect data");
                         goto err;
                 }
         }
 
-        size_t j = i;
-        for (; j < i + QUEUE_MAX_SIZE - 1; j++) {
-                if (queue_push(queue, item[j], strlen(item[j]) + 1)) {
-                        strcpy(err_msg, "'queue_push' failed; ordinary case");
-                        goto err;
-                }
-        }
-        /* need to swap values of i and j because both will be used later in the code */
-        i ^= j;
-        j ^= i;
-        i ^= j;
-
-        if (!queue_full(queue)) {
-                strcpy(err_msg, "'queue_full' failed; queue should be full");
+        /* i == 0 here, i.e. index of first data item */
+        data_size = DATA_MAX_SIZE;
+        if (queue_pop(queue, data, &data_size)) {
+                strcpy(err_msg, "[queue_pop] should not fail with non-empty "
+                                "queue and correct input args (inversed order "
+                                "of data items)");
                 goto err;
         }
 
-        if (queue_pop(queue)) {
-                        strcpy(err_msg, "'queue_pop' failed; ordinary case");
-                        goto err;
+        if (strcmp(data, data_arr[QUEUE_MAX_SIZE - 1])) {
+                strcpy(err_msg, "[queue_pop] returned incorrect data");
+                goto err;
         }
+        /* since i == 0, do not decrement it */
 
-        if (!queue_push(queue, item[i], strlen(item[i]) + 1)) {
-                strcpy(err_msg, "'queue_push' failed; function had to return error");
+        data_size = DATA_MAX_SIZE;
+        if (!queue_try_pop(queue, data, &data_size)) {
+                strcpy(err_msg, "[queue_try_pop] should had failed for empty "
+                                "queue but had not");
                 goto err;
         }
 
-        for (i = 0; i < QUEUE_MAX_SIZE - 1; i++) {
-                /* NOTE: following queue_front usege is not thread safe */
-                size_t it_sz = 0;
-                queue_front(queue, NULL, &it_sz);
-                char it[it_sz];
-                queue_front(queue, it, &it_sz);
-
-                if (strcmp(item[j], it) || it_sz != (strlen(item[j]) + 1)) {
-                        strcpy(err_msg, "'queue_front' failed; wrong return result");
-                        goto err;
-                }
-                ++j;
-
-                if(queue_pop(queue)) {
-                        strcpy(err_msg, "'queue_pop' failed; ordinary case");
-                        goto err;
-                }
-
-                if (queue_full(queue)) {
-                        strcpy(err_msg, "'queue_full' failed; queue should not be full");
-                        goto err;
-                }
-
-                if ((i != (QUEUE_MAX_SIZE - 2)) && queue_empty(queue)) {
-                        strcpy(err_msg, "'queue_empty' failed; queue should not be empty");
-                        goto err;
-                }
+        /* queue is empty; test *_try_* versions of push and pop */
+        i = 0;
+        while (!queue_try_push(queue, data_arr[i], strlen(data_arr[i]) + 1)) {
+                ++i;
         }
 
-        if (!queue_empty(queue)) {
-                strcpy(err_msg, "'queue_empty' failed; queue should be empty");
+        if (i != QUEUE_MAX_SIZE) {
+                strcpy(err_msg, "[queue_try_push] should not have failed on "
+                                "the tested iteration");
                 goto err;
         }
 
-        if(!queue_pop(queue)) {
-                strcpy(err_msg, "'queue_pop' failed; function had to return error");
+        data_size = DATA_MAX_SIZE;
+        while (!queue_try_pop(queue, data, &data_size)) {
+                --i;
+                data_size = DATA_MAX_SIZE;
+        }
+
+        if (i != 0) {
+                strcpy(err_msg, "[queue_try_pop] should not have failed on "
+                                "the tested iteration");
                 goto err;
         }
 
-        queue_free(queue);
+        /* testing too long data item */
+        if (!queue_push(queue, very_long_data, strlen(very_long_data))) {
+                strcpy(err_msg, "[queue_push] should had failed for too "
+                                "long data item but had not");
+                goto err;
+        }
 
+        queue_destroy(queue);
+        *queue_p = NULL;
+
+        /* success */
         return 0;
 
-err:
-        stream = fopen("./test-queue.dump", "w");
-        if (!stream) {
+    err:
+        /* failure */
+        *queue_p = queue;
+        return -1;
+}
+
+static void *consumer_routine(void *args) {
+        queue_t *queue = (queue_t *)args;
+
+        pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
+        pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL);
+
+        pthread_mutex_lock(&start_mutex);
+        while (!start_flag) {
+                pthread_cond_wait(&start_cond, &start_mutex);
+        }
+        pthread_mutex_unlock(&start_mutex);
+
+        char data[DATA_STR_LEN_THREAD];
+        size_t data_size = DATA_STR_LEN_THREAD;
+
+        for (int i = 0; i < ITERATIONS_PER_THREAD; i++) {
+                if (queue_pop(queue, data, &data_size)) {
+
+                }
+                data_size = DATA_STR_LEN_THREAD;
+                pthread_testcancel();
+        }
+
+        pthread_mutex_lock(&finish_mutex);
+        ++threads_finished;
+        pthread_cond_signal(&finish_cond);
+        pthread_mutex_unlock(&finish_mutex);
+
+        return NULL;
+}
+
+static void *supplier_routine(void *args) {
+        queue_t *queue = (queue_t *)args;
+
+        pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
+        pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL);
+
+        pthread_mutex_lock(&start_mutex);
+        while (!start_flag) {
+                pthread_cond_wait(&start_cond, &start_mutex);
+        }
+        pthread_mutex_unlock(&start_mutex);
+
+        for (int i = 0; i < ITERATIONS_PER_THREAD; i++) {
+                if (queue_push(queue, DATA_STR_THREAD, DATA_STR_LEN_THREAD)) {
+
+                }
+                pthread_testcancel();
+        }
+
+        pthread_mutex_lock(&finish_mutex);
+        ++threads_finished;
+        pthread_cond_signal(&finish_cond);
+        pthread_mutex_unlock(&finish_mutex);
+
+        return NULL;
+}
+
+static int test_queue_parallel_access(char *err_msg, queue_t **queue_p) {
+        queue_t *queue = NULL;
+        pthread_t consumer_1,
+                  consumer_2,
+                  supplier_1,
+                  supplier_2;
+
+        if (queue_init(&queue, QUEUE_MAX_SIZE, DATA_MAX_SIZE)) {
+                strcpy(err_msg, "[queue_init] should not fail with correct "
+                                "input args");
+                *queue_p = queue;
                 return -1;
         }
 
-        queue_print(stream, queue); /* print out queue on error case */
-        queue_free(queue);
+        if (pthread_create(&consumer_1, NULL, consumer_routine, queue)) {
+                strcpy(err_msg, "[pthread_create] failed for 1st consumer");
+                *queue_p = NULL;
+                queue_destroy(queue);
+                return -1;
+        }
 
-        fclose(stream); /* does not really want to know if fclose fail here or not */
+        if (pthread_create(&supplier_1, NULL, supplier_routine, queue)) {
+                strcpy(err_msg, "[pthread_create] failed for 1st supplier");
+                *queue_p = NULL;
+                queue_destroy(queue);
+                return -1;
+        }
+
+        if (pthread_create(&consumer_2, NULL, consumer_routine, queue)) {
+                strcpy(err_msg, "[pthread_create] failed for 2nd consumer");
+                *queue_p = NULL;
+                queue_destroy(queue);
+                return -1;
+        }
+
+        if (pthread_create(&supplier_2, NULL, supplier_routine, queue)) {
+                strcpy(err_msg, "[pthread_create] failed for 2nd supplier");
+                *queue_p = NULL;
+                queue_destroy(queue);
+                return -1;
+        }
+
+        pthread_mutex_lock(&start_mutex);
+        start_flag = 1;
+        pthread_cond_broadcast(&start_cond);
+        pthread_mutex_unlock(&start_mutex);
+
+        pthread_mutex_lock(&finish_mutex);
+        struct timespec tm = {
+                .tv_sec = time(NULL) + 5,
+                .tv_nsec = 0,
+        };
+        int status;
+        while (threads_finished != 4) {
+                status = pthread_cond_timedwait(&finish_cond,
+                                           &finish_mutex,
+                                           &tm);
+                if (status == ETIMEDOUT) {
+                        break;
+                }
+        }
+
+        if (threads_finished != 4) {
+                pthread_mutex_unlock(&finish_mutex);
+                pthread_cancel(consumer_1);
+                pthread_cancel(supplier_1);
+                pthread_cancel(consumer_2);
+                pthread_cancel(supplier_2);
+
+
+
+                strcpy(err_msg, "deadlock most probably has happen; "
+                                "wait timeout exceeded");
+                *queue_p = queue;
+                return -1;
+        }
+        pthread_mutex_unlock(&finish_mutex);
+
+        /* now we have one one (this) thread; queue size should be 0 here */
+        pthread_join(consumer_1, NULL);
+        pthread_join(supplier_1, NULL);
+        pthread_join(consumer_2, NULL);
+        pthread_join(supplier_2, NULL);
+
+        return 0;
+}
+
+int test_queue(char *err_msg) {
+        queue_t *queue;
+
+        if (test_queue_api(err_msg, &queue)) {
+                goto err;
+        }
+
+        queue = NULL; /* we want a "fresh" queue in the next series of tests */
+
+        if (test_queue_parallel_access(err_msg, &queue)) {
+                goto err;
+        }
+
+        return 0;
+
+    err:
+        /* do-while is needed because a label can only be part of a statement */
+        do {
+                FILE *stream;
+                if (queue != NULL)  {
+                        stream = fopen("./test-queue.dump", "w");
+                        if (!stream) {
+                                return -1;
+                        }
+
+                        queue_print(stream, queue);
+                }
+                queue_destroy(queue);
+
+                /* does not really want to know if fclose fail here or not */
+                fclose(stream);
+        } while(0);
 
         return -1;
 }

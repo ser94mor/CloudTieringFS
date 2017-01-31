@@ -31,6 +31,7 @@ static const char *test_conf_str = \
         "    FsMountPoint             /foo/bar\n"           \
         "    LoggingFramework         simple\n"             \
         "    RemoteStoreProtocol      s3\n"                 \
+        "    PathMax                  127\n"                \
         "</General>\n"                                      \
         "<Internal>\n"                                      \
         "    ScanfsIterTimeoutSec     100\n"                \
@@ -107,6 +108,7 @@ int test_conf(char *err_msg) {
             conf->out_q_max_size != 9999 ||
             conf->in_q_max_size != 1111 ||
             conf->s3_operation_retries != 5 ||
+            conf->path_max != (127 + 1) ||
             log->type != e_simple
         ) {
                 strcpy(err_msg, "configuration contains incorrect values");
