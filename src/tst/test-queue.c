@@ -15,6 +15,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#define _GNU_SOURCE /* needed for pthread_timedjoin_np() */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -27,7 +29,9 @@
 #define QUEUE_MAX_SIZE    3
 #define DATA_MAX_SIZE     20
 
-#define ITERATIONS_PER_THREAD    1000000
+#define ITERATIONS_PER_THREAD    500000
+#define COND_WAIT_SECS_THREAD    5
+#define THREAD_JOIN_TIMEOUT      3
 #define DATA_STR_THREAD          "data"
 #define DATA_STR_LEN_THREAD      5
 
@@ -43,6 +47,12 @@ static const char *very_long_data =
         "to exceed itém limít.";
 
 /* the following globals are needed for parallel access test */
+static pthread_t consumer_1,
+                 consumer_2,
+                 supplier_1,
+                 supplier_2;
+
+
 static pthread_cond_t  finish_cond  = PTHREAD_COND_INITIALIZER;
 static pthread_mutex_t finish_mutex = PTHREAD_MUTEX_INITIALIZER;
 static int threads_finished = 0;
@@ -56,9 +66,20 @@ static int queue_print(FILE *stream, queue_t *queue) {
                 return -1;
         }
 
-        pthread_mutex_lock(&queue->head_mutex);
-        pthread_mutex_lock(&queue->tail_mutex);
-        pthread_mutex_lock(&queue->size_mutex);
+        if (pthread_mutex_trylock(&queue->head_mutex)) {
+                return -1;
+        }
+
+        if (pthread_mutex_trylock(&queue->tail_mutex)) {
+                pthread_mutex_unlock(&queue->head_mutex);
+                return -1;
+        }
+
+        if (pthread_mutex_lock(&queue->size_mutex)) {
+                pthread_mutex_unlock(&queue->tail_mutex);
+                pthread_mutex_unlock(&queue->head_mutex);
+                return -1;
+        }
 
         char *q_ptr = queue->head;
 
@@ -238,10 +259,10 @@ static int test_queue_api(char *err_msg, queue_t **queue_p) {
 }
 
 static void *consumer_routine(void *args) {
-        queue_t *queue = (queue_t *)args;
+        pthread_setcanceltype(PTHREAD_CANCEL_ENABLE, NULL);
+        pthread_setcancelstate(PTHREAD_CANCEL_DEFERRED, NULL);
 
-        pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
-        pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL);
+        queue_t *queue = (queue_t *)args;
 
         pthread_mutex_lock(&start_mutex);
         while (!start_flag) {
@@ -254,7 +275,7 @@ static void *consumer_routine(void *args) {
 
         for (int i = 0; i < ITERATIONS_PER_THREAD; i++) {
                 if (queue_pop(queue, data, &data_size)) {
-
+                        return "queue_pop failed";
                 }
                 data_size = DATA_STR_LEN_THREAD;
                 pthread_testcancel();
@@ -269,10 +290,10 @@ static void *consumer_routine(void *args) {
 }
 
 static void *supplier_routine(void *args) {
-        queue_t *queue = (queue_t *)args;
+        pthread_setcanceltype(PTHREAD_CANCEL_ENABLE, NULL);
+        pthread_setcancelstate(PTHREAD_CANCEL_DEFERRED, NULL);
 
-        pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
-        pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL);
+        queue_t *queue = (queue_t *)args;
 
         pthread_mutex_lock(&start_mutex);
         while (!start_flag) {
@@ -282,7 +303,7 @@ static void *supplier_routine(void *args) {
 
         for (int i = 0; i < ITERATIONS_PER_THREAD; i++) {
                 if (queue_push(queue, DATA_STR_THREAD, DATA_STR_LEN_THREAD)) {
-
+                        return "queue_push failed";
                 }
                 pthread_testcancel();
         }
@@ -297,10 +318,6 @@ static void *supplier_routine(void *args) {
 
 static int test_queue_parallel_access(char *err_msg, queue_t **queue_p) {
         queue_t *queue = NULL;
-        pthread_t consumer_1,
-                  consumer_2,
-                  supplier_1,
-                  supplier_2;
 
         if (queue_init(&queue, QUEUE_MAX_SIZE, DATA_MAX_SIZE)) {
                 strcpy(err_msg, "[queue_init] should not fail with correct "
@@ -344,14 +361,14 @@ static int test_queue_parallel_access(char *err_msg, queue_t **queue_p) {
 
         pthread_mutex_lock(&finish_mutex);
         struct timespec tm = {
-                .tv_sec = time(NULL) + 5,
+                .tv_sec = time(NULL) + COND_WAIT_SECS_THREAD,
                 .tv_nsec = 0,
         };
         int status;
         while (threads_finished != 4) {
                 status = pthread_cond_timedwait(&finish_cond,
-                                           &finish_mutex,
-                                           &tm);
+                                                &finish_mutex,
+                                                &tm);
                 if (status == ETIMEDOUT) {
                         break;
                 }
@@ -359,21 +376,95 @@ static int test_queue_parallel_access(char *err_msg, queue_t **queue_p) {
 
         if (threads_finished != 4) {
                 pthread_mutex_unlock(&finish_mutex);
+
+                strcpy(err_msg, "deadlock has happen (most probably):");
+
+                char *retval = NULL;
+                tm.tv_sec = time(NULL) + THREAD_JOIN_TIMEOUT;
+                tm.tv_nsec = 0;
+
                 pthread_cancel(consumer_1);
+                if (pthread_timedjoin_np(consumer_1,
+                                         (void *)&retval,
+                                         &tm) == ETIMEDOUT) {
+                        retval = "failed to cancel "
+                                 "(most probably waiting on mutex)";
+                }
+
+                if (retval) {
+                        if (retval == PTHREAD_CANCELED) {
+                                retval = "cancelled";
+                        }
+                        sprintf(err_msg,
+                                "%s [1st consumer: %s]",
+                                err_msg,
+                                retval);
+                }
+                retval = NULL;
+
                 pthread_cancel(supplier_1);
+                if (pthread_timedjoin_np(supplier_1,
+                                         (void *)&retval,
+                                         &tm) == ETIMEDOUT) {
+                        retval = "failed to cancel "
+                                 "(most probably waiting on mutex)";
+                }
+
+                if (retval) {
+                        if (retval == PTHREAD_CANCELED) {
+                                retval = "cancelled";
+                        }
+                        sprintf(err_msg,
+                                "%s [1st supplier: %s]",
+                                err_msg,
+                                retval);
+                }
+                retval = NULL;
+
                 pthread_cancel(consumer_2);
+                if (pthread_timedjoin_np(consumer_2,
+                                         (void *)&retval,
+                                         &tm) == ETIMEDOUT) {
+                        retval = "failed to cancel "
+                                 "(most probably waiting on mutex)";
+                }
+
+                if (retval) {
+                        if (retval == PTHREAD_CANCELED) {
+                                retval = "cancelled";
+                        }
+                        sprintf(err_msg,
+                                "%s [2nd consumer: %s]",
+                                err_msg,
+                                retval);
+                }
+                retval = NULL;
+
                 pthread_cancel(supplier_2);
+                if (pthread_timedjoin_np(supplier_2,
+                                         (void *)&retval,
+                                         &tm) == ETIMEDOUT) {
+                        retval = "failed to cancel "
+                                 "(most probably waiting on mutex)";
+                }
 
+                if (retval) {
+                        if (retval == PTHREAD_CANCELED) {
+                                retval = "cancelled";
+                        }
+                        sprintf(err_msg,
+                                "%s [2nd supplier: %s]",
+                                err_msg,
+                                retval);
+                }
+                retval = NULL;
 
-
-                strcpy(err_msg, "deadlock most probably has happen; "
-                                "wait timeout exceeded");
                 *queue_p = queue;
                 return -1;
         }
+
         pthread_mutex_unlock(&finish_mutex);
 
-        /* now we have one one (this) thread; queue size should be 0 here */
         pthread_join(consumer_1, NULL);
         pthread_join(supplier_1, NULL);
         pthread_join(consumer_2, NULL);
