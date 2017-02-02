@@ -102,16 +102,6 @@ static DOTCONF_CB(scanfs_iter_tm_sec_cb) {
         return NULL;
 }
 
-static DOTCONF_CB(scanfs_max_fails_cb) {
-        conf->scanfs_max_fails = (int)cmd->data.value;
-        return NULL;
-}
-
-static DOTCONF_CB(move_file_max_fails_cb) {
-        conf->move_file_max_fails = (int)cmd->data.value;
-        return NULL;
-}
-
 static DOTCONF_CB(move_out_start_rate_cb) {
         conf->move_out_start_rate = (double)cmd->data.dvalue;
         return NULL;
@@ -122,13 +112,23 @@ static DOTCONF_CB(move_out_stop_rate_cb) {
         return NULL;
 }
 
-static DOTCONF_CB(out_q_max_size_cb) {
-        conf->out_q_max_size = (size_t)cmd->data.value;
+static DOTCONF_CB(primary_download_queue_max_size_cb) {
+        conf->primary_download_queue_max_size = (size_t)cmd->data.value;
         return NULL;
 }
 
-static DOTCONF_CB(in_q_max_size_cb) {
-        conf->in_q_max_size = (size_t)cmd->data.value;
+static DOTCONF_CB(secondary_download_queue_max_size_cb) {
+        conf->secondary_download_queue_max_size = (size_t)cmd->data.value;
+        return NULL;
+}
+
+static DOTCONF_CB(primary_upload_queue_max_size_cb) {
+        conf->primary_upload_queue_max_size = (size_t)cmd->data.value;
+        return NULL;
+}
+
+static DOTCONF_CB(secondary_upload_queue_max_size_cb) {
+        conf->secondary_upload_queue_max_size = (size_t)cmd->data.value;
         return NULL;
 }
 
@@ -196,33 +196,33 @@ static DOTCONF_CB(path_max_cb) {
 *******************************************************************************/
 static const configoption_t options[] = {
         /* General section */
-        { beg_General_section_str,       ARG_NONE,   beg_General_section_cb,       NULL, CTX_ALL                    },
-        { "FsMountPoint",                ARG_STR,    fs_mount_point_cb,            NULL, SECTION_CTX(General)       },
-        { "LoggingFramework",            ARG_STR,    logger_cb,                    NULL, SECTION_CTX(General)       },
-        { "RemoteStoreProtocol",         ARG_STR,    remote_store_protocol_cb,     NULL, SECTION_CTX(General)       },
-        { "PathMax",                     ARG_INT,    path_max_cb,                  NULL, SECTION_CTX(General)       },
-        { end_General_section_str,       ARG_NONE,   end_General_section_cb,       NULL, CTX_ALL                    },
+        { beg_General_section_str, ARG_NONE, beg_General_section_cb,   NULL, CTX_ALL              },
+        { "FsMountPoint",          ARG_STR,  fs_mount_point_cb,        NULL, SECTION_CTX(General) },
+        { "LoggingFramework",      ARG_STR,  logger_cb,                NULL, SECTION_CTX(General) },
+        { "RemoteStoreProtocol",   ARG_STR,  remote_store_protocol_cb, NULL, SECTION_CTX(General) },
+        { "PathMax",               ARG_INT,  path_max_cb,              NULL, SECTION_CTX(General) },
+        { end_General_section_str, ARG_NONE, end_General_section_cb,   NULL, CTX_ALL              },
 
         /* Internal section */
-        { beg_Internal_section_str,      ARG_NONE,   beg_Internal_section_cb,      NULL, CTX_ALL                    },
-        { "ScanfsIterTimeoutSec",        ARG_INT,    scanfs_iter_tm_sec_cb,        NULL, SECTION_CTX(Internal)      },
-        { "ScanfsMaximumFailures",       ARG_INT,    scanfs_max_fails_cb,          NULL, SECTION_CTX(Internal)      },
-        { "MoveFileMaximumFailures",     ARG_INT,    move_file_max_fails_cb,       NULL, SECTION_CTX(Internal)      },
-        { "MoveOutStartRate",            ARG_DOUBLE, move_out_start_rate_cb,       NULL, SECTION_CTX(Internal)      },
-        { "MoveOutStopRate",             ARG_DOUBLE, move_out_stop_rate_cb,        NULL, SECTION_CTX(Internal)      },
-        { "OutQueueMaxSize",             ARG_INT,    out_q_max_size_cb,            NULL, SECTION_CTX(Internal)      },
-        { "InQueueMaxSize",              ARG_INT,    in_q_max_size_cb,             NULL, SECTION_CTX(Internal)      },
-        { end_Internal_section_str,      ARG_NONE,   end_Internal_section_cb,      NULL, CTX_ALL                    },
+        { beg_Internal_section_str,        ARG_NONE,   beg_Internal_section_cb,              NULL, CTX_ALL               },
+        { "ScanfsIterTimeoutSec",          ARG_INT,    scanfs_iter_tm_sec_cb,                NULL, SECTION_CTX(Internal) },
+        { "MoveOutStartRate",              ARG_DOUBLE, move_out_start_rate_cb,               NULL, SECTION_CTX(Internal) },
+        { "MoveOutStopRate",               ARG_DOUBLE, move_out_stop_rate_cb,                NULL, SECTION_CTX(Internal) },
+        { "PrimaryDownloadQueueMaxSize",   ARG_INT,    primary_download_queue_max_size_cb,   NULL, SECTION_CTX(Internal) },
+        { "SecondaryDownloadQueueMaxSize", ARG_INT,    secondary_download_queue_max_size_cb, NULL, SECTION_CTX(Internal) },
+        { "PrimaryUploadQueueMaxSize",     ARG_INT,    primary_upload_queue_max_size_cb,     NULL, SECTION_CTX(Internal) },
+        { "SecondaryUploadQueueMaxSize",   ARG_INT,    secondary_upload_queue_max_size_cb,   NULL, SECTION_CTX(Internal) },
+        { end_Internal_section_str,        ARG_NONE,   end_Internal_section_cb,              NULL, CTX_ALL               },
 
         /* S3RemoteStore section */
-        { beg_S3RemoteStore_section_str, ARG_NONE,   beg_S3RemoteStore_section_cb, NULL, CTX_ALL                    },
-        { "Hostname",                    ARG_STR,    hostname_cb,                  NULL, SECTION_CTX(S3RemoteStore) },
-        { "Bucket",                      ARG_STR,    bucket_cb,                    NULL, SECTION_CTX(S3RemoteStore) },
-        { "AccessKeyId",                 ARG_STR,    access_key_id_cb,             NULL, SECTION_CTX(S3RemoteStore) },
-        { "SecretAccessKey",             ARG_STR,    secret_access_key_cb,         NULL, SECTION_CTX(S3RemoteStore) },
-        { "TransferProtocol",            ARG_STR,    transfer_protocol_cb,         NULL, SECTION_CTX(S3RemoteStore) },
-        { "OperationRetries",            ARG_INT,    operation_retries_cb,         NULL, SECTION_CTX(S3RemoteStore) },
-        { end_S3RemoteStore_section_str, ARG_NONE,   end_S3RemoteStore_section_cb, NULL, CTX_ALL                    },
+        { beg_S3RemoteStore_section_str, ARG_NONE, beg_S3RemoteStore_section_cb, NULL, CTX_ALL                    },
+        { "Hostname",                    ARG_STR,  hostname_cb,                  NULL, SECTION_CTX(S3RemoteStore) },
+        { "Bucket",                      ARG_STR,  bucket_cb,                    NULL, SECTION_CTX(S3RemoteStore) },
+        { "AccessKeyId",                 ARG_STR,  access_key_id_cb,             NULL, SECTION_CTX(S3RemoteStore) },
+        { "SecretAccessKey",             ARG_STR,  secret_access_key_cb,         NULL, SECTION_CTX(S3RemoteStore) },
+        { "TransferProtocol",            ARG_STR,  transfer_protocol_cb,         NULL, SECTION_CTX(S3RemoteStore) },
+        { "OperationRetries",            ARG_INT,  operation_retries_cb,         NULL, SECTION_CTX(S3RemoteStore) },
+        { end_S3RemoteStore_section_str, ARG_NONE, end_S3RemoteStore_section_cb, NULL, CTX_ALL                    },
 
         LAST_OPTION
 };

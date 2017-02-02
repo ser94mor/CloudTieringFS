@@ -242,55 +242,6 @@ int  queue_pop(queue_t *queue, char *data, size_t *data_size);
 int  queue_try_pop(queue_t *queue, char *data, size_t *data_size);
 
 
-
-typedef struct {
-        const queue_t *primary_queue;
-
-        const queue_t *secondary_queue;
-
-        /* a mutex to ensure a thread-safety property */
-        pthread_mutex_t mutex;
-} pqueue_t;
-
-enum data_priority_enum {
-        e_primary,
-        e_secondary,
-};
-
-/* functions to work with priority queue data structure */
-pqueue_t *pqueue_alloc(size_t queue_max_size,
-                       size_t data_max_size);
-void      pqueue_free(pqueue_t *queue);
-int       pqueue_enqueue(pqueue_t* pqueue, const char* data, size_t data_size, enum data_priority_enum data_type);
-int       pqueue_dequeue(pqueue_t *queue,
-                         char *data,
-                         size_t *data_size);
-
-#define QUEUE_ALLOC(queue, args...) \
-        _Generic((queue), queue_t *: queue_alloc, \
-                          pqueue_t *: pqueue_alloc)( args )
-
-#define QUEUE_FREE(queue) \
-        _Generic((queue), queue_t *: queue_free, \
-                          pqueue_t *: pqueue_free)( args )
-
-#define QUEUE_PUSH(queue, args...) \
-        _Generic((queue), queue_t *: queue_push, \
-                          pqueue_t *:  pqueue_push)(queue, ##args)
-
-#define QUEUE_FRONT(queue, args...) \
-        _Generic((queue), queue_t *: queue_front, \
-                          pqueue_t *:  pqueue_front)(queue, ##args)
-
-#define QUEUE_POP(queue) \
-        _Generic((queue), queue_t *: queue_pop, \
-                          pqueue_t *:  pqueue_pop)(queue)\
-
-struct queue_tuple {
-        queue_t  *upload_queue;
-        pqueue_t *download_queue;
-};
-
 /*******************************************************************************
 * CONFIGURATION                                                                *
 * -------------                                                                *
@@ -396,8 +347,10 @@ int  s3_download(const char *path);
 int  s3_upload(const char *path);
 void s3_disconnect(void);
 
-int move_file(queue_t *queue);
+int download_file(const char *path);
+int upload_file(const char *path);
 int is_file_local(const char *path);
+int is_valid_path(const char *path);
 
 
 #include <stddef.h>
@@ -408,12 +361,16 @@ typedef struct {
         char   fs_mount_point[4096];          /* filesystem's root directory */
 
         time_t scanfs_iter_tm_sec;            /* the lowest time interval between file system scan iterations */
-        int    scanfs_max_fails;              /* the maximum number of allowed failures of scanfs execution */
-        int    move_file_max_fails;           /* the maximum number of allowed failures of file_move execution */
+
         double move_out_start_rate;           /* start evicting files when storage is (move_out_start_rate * 100)% full */
         double move_out_stop_rate;            /* stop evicting files when storage is (move_out_stop_rate * 100)% full */
-        size_t out_q_max_size;                /* maximum size of out queue */
-        size_t in_q_max_size;                 /* maximum size of in queue */
+
+        size_t primary_download_queue_max_size;
+        size_t secondary_download_queue_max_size;
+
+        size_t primary_upload_queue_max_size;
+        size_t secondary_upload_queue_max_size;
+
         size_t path_max;                      /* maximum path length in fs_mount_point directory can not be lower than this value */
 
         /* 63 it is unlikely that protocol identifies require more symbols */
@@ -448,7 +405,7 @@ ops_t  *get_ops();
  * SCANFS
  */
 
-int scanfs(queue_t *in_q, queue_t *out_q);
+int scan_fs(queue_t *download_queue, queue_t *upload_queue);
 
 
 #endif /* CLOUDTIERING_H */

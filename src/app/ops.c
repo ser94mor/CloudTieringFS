@@ -177,7 +177,7 @@ int is_file_local(const char *path) {
  * @return 1: if path is valid
  *         0: if path is not valid
  */
-static int is_valid_path(const char *path) {
+int is_valid_path(const char *path) {
         struct stat path_stat;
         if ((stat(path, &path_stat) == -1) || !S_ISREG(path_stat.st_mode)) {
                 return 0; /* false */
@@ -195,7 +195,7 @@ static int is_valid_path(const char *path) {
  *         -1: file has not been upload due to error or access to file
  *             has happen during eviction
  */
-static int upload_file(const char *path) {
+int upload_file(const char *path) {
         /* set lock to file to prevent other threads' and processes'
            access to file's data */
         if (lock_file(path) == -1) {
@@ -290,85 +290,7 @@ static int upload_file(const char *path) {
  *         -1: failure happen due dowload of file or
  *             file is currently being downloaded by another thread
  */
-static int dowload_file(const char *path) {
+int download_file(const char *path) {
         /* TODO: need to implement this function */
-        return -1;
-}
-
-/**
- * @brief move_file Download or upload file in the front of the queue.
- *                  Move direction is obvious from file attributes.
- *
- * @param[in,out] queue Queue with candidate files for download or upload.
- *
- * @return  0: download or upload operation succeeded
- *         -1: failure happen and download or upload was not successful
- */
-int move_file(queue_t *queue) {
-        if (!queue_empty(queue)) {
-                /* double queue_front invocation does not lead to violation of
-                   thread-safeness since given queue has only one consumer
-                   (this thread) */
-
-                /* get item size of front element */
-                size_t it_sz = 0;
-                queue_front(queue, NULL, &it_sz);
-
-                /* get front element of the queue */
-                char path[it_sz];
-                queue_front(queue, path, &it_sz);
-
-                if (path == NULL) {
-                        strcpy(err_buf, "failed to get front element of queue");
-                        goto err;
-                }
-
-                if (!is_valid_path(path)) {
-                        sprintf(err_buf, "path %s is not valid", path);
-                        goto err;
-                }
-
-                int local_flag = is_file_local(path);
-                if (local_flag == -1) {
-                        /* do nothing if unable to determine file's location */
-                        sprintf(err_buf,
-                                "unable to determine file's location "
-                                "[file: %s]",
-                                path);
-                        goto err;
-                } else if (local_flag) {
-                        /* local files should be uploaded */
-                        if (upload_file(path) == -1) {
-                                sprintf(err_buf,
-                                        "upload of file %s failed",
-                                        path);
-                                goto err;
-                        }
-                } else {
-                        /* remote files should be downloaded */
-                        if (dowload_file(path) == -1) {
-                                sprintf(err_buf,
-                                        "download of file %s failed",
-                                        path);
-                                goto err;
-                        }
-                }
-
-                queue_pop(queue);
-                LOG(INFO,
-                    "file %s successfully %s",
-                    path,
-                    (local_flag ? "uploaded" : "downloaded"));
-        } else {
-                /* queue is empty; nothing to be done */
-        }
-
-        /* return successfully if there are no files to download/upload or
-           download/upload operation was successful */
-        return 0;
-
-        err:
-        queue_pop(queue);
-        LOG(ERROR, "failed to move file [reason: %s]", err_buf);
         return -1;
 }

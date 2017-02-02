@@ -14,39 +14,41 @@
 /*******************
  * Scan filesystem *
  * *****************/
-/* queue might be full and we need to perform several attempts giving a chance
- * for other threads to pop elements from queue */
-#define QUEUE_PUSH_RETRIES              5
-#define QUEUE_PUSH_ATTEMPT_SLEEP_SEC    1
 
 static queue_t *in_queue  = NULL;
 static queue_t *out_queue = NULL;
 
 static int update_evict_queue(const char *fpath, const struct stat *sb,  int typeflag, struct FTW *ftwbuf) {
-        int attempt = 0;
 
         struct stat path_stat;
         if (stat(fpath, &path_stat) == -1) {
-                return 0; /* just continue with the next files; non-zero will cause failure of nftw() */
+                /* just continue with the next files; non-zero will
+                   cause failure of nftw() */
+                return 0;
         }
 
-        if (S_ISREG(path_stat.st_mode) &&
-                is_file_local(fpath) &&
-                (path_stat.st_atime + 600) < time(NULL)) {
-                do {
-                        if (queue_push(out_queue, (char *)fpath, strlen(fpath) + 1) == -1) {
-                                ++attempt;
-                                continue;
-                        }
-                        LOG(DEBUG, "file '%s' pushed to out queue", fpath);
-                        break;
-                } while ((attempt < QUEUE_PUSH_RETRIES) && (queue_full((queue_t *)out_queue) > 0));
-                }
+        if (is_valid_path(fpath) &&
+            is_file_local(fpath) &&
+            (path_stat.st_atime + 600) < time(NULL)) {
 
-                return 0;
+                char *data = (char *)fpath;
+                size_t data_size = strlen(fpath) + 1;
+
+                if (queue_push(out_queue, data, data_size) == -1) {
+                        LOG(ERROR,
+                            "queue_push failed [data: %s; data size: %zu, "
+                            "path size max: %zu]",
+                            data,
+                            data_size,
+                            get_conf()->path_max);
+                        /* say that error happen, but do not abort execution */
+                }
+        }
+
+        return 0;
 }
 
-int scanfs(queue_t *in_q, queue_t *out_q) {
+int scan_fs(queue_t *in_q, queue_t *out_q) {
         conf_t *conf = get_conf();
 
         in_queue  = in_q;
