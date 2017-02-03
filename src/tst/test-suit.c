@@ -39,8 +39,12 @@ int main(int argc, char *argv[]) {
 
         int res;
         for (size_t i = 0; i < tst_cases; i++) {
+                printf("\n\t%s: ", test_suit[i].name);
+                fflush(stdout);
+
                 res = test_suit[i].func(err_msg);
-                printf("\n\t%s: %s\n", test_suit[i].name, res ? "failure" : "success");
+
+                printf("%s\n", res ? "failure" : "success");
                 if (res) {
                         printf("\t\tREASON: %s\n", err_msg);
                         ++fail_cnt;

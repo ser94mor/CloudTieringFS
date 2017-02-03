@@ -253,7 +253,7 @@ int upload_file(const char *path) {
 
         return 0;
 
-        err_location_unlock:
+    err_location_unlock:
         /* remove location attribute */
         if (removexattr(path, xattr_str[e_location]) == -1) {
                 /* non-existance of location attribute indicates an error
@@ -271,7 +271,7 @@ int upload_file(const char *path) {
                     err_buf);
         }
 
-        err_unlock:
+    err_unlock:
         /* unset lock from file */
         if (unlock_file(path) == -1) {
                 /* TODO: do some repair actions;
@@ -291,6 +291,50 @@ int upload_file(const char *path) {
  *             file is currently being downloaded by another thread
  */
 int download_file(const char *path) {
-        /* TODO: need to implement this function */
+        /* set lock to file to prevent other threads' and processes'
+           access to file's data */
+        if (lock_file(path) == -1) {
+                return -1;
+        }
+
+        /* upload file's data to remote storage */
+        if (get_ops()->download(path) == -1) {
+                goto err_unlock; /* unset lock and exit */
+        }
+
+        /* remove location attribute */
+        if (removexattr(path, xattr_str[e_location]) == -1) {
+                /* non-existance of location attribute indicates an error
+                   in logic of this program */
+
+                /* strerror_r() with very low probability can fail;
+                   ignore such failures */
+                strerror_r(errno, err_buf, ERR_MSG_BUF_LEN);
+
+                LOG(ERROR,
+                    "failed to remove extended attribute %s of file %s "
+                    "[reason: %s]",
+                    xattr_str[e_location],
+                    path,
+                    err_buf);
+        }
+
+        /* all actions indended to file download succeeded;
+           just need to unlock */
+        if (unlock_file(path) == -1) {
+                /* TODO: do some repair actions;
+                         files should not be left locked */
+                return -1;
+        }
+
+        return 0;
+
+    err_unlock:
+        /* unset lock from file */
+        if (unlock_file(path) == -1) {
+                /* TODO: do some repair actions;
+                         files should not be left locked */
+        }
+
         return -1;
 }
