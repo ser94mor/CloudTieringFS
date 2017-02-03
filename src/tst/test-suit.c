@@ -31,7 +31,8 @@ static struct test_case {
 };
 
 int main(int argc, char *argv[]) {
-        int tst_cases = sizeof(test_suit) / sizeof(struct test_case); /* number of test cases */
+        /* number of test cases */
+        int tst_cases = sizeof(test_suit) / sizeof(struct test_case);
         int fail_cnt = 0; /* counter of failed cases */
         char err_msg[BUFSIZ]; /* buffer for error message */
 
@@ -52,7 +53,9 @@ int main(int argc, char *argv[]) {
                 fflush(stdout);
         }
 
-        printf("\n\tRESULT:\n\t\tsuccesses: %d\n\t\tfailures:  %d\n", tst_cases - fail_cnt, fail_cnt);
+        printf("\n\tRESULT:\n\t\tsuccesses: %d\n\t\tfailures:  %d\n",
+               tst_cases - fail_cnt,
+               fail_cnt);
 
         printf("FINISH TEST SUIT (%d test cases)\n", tst_cases);
 
