@@ -67,8 +67,15 @@ struct s3_cb_data {
 /* used in s3_put_object_data_callback();
    convinient to give file's stuff as a single argument */
 struct s3_put_object_callback_data {
-        FILE *infile;
+        FILE *file;
         uint64_t content_length;
+};
+
+/* used in s3_get_object_data_callback(); not needed since it has only one
+   member but still defined in order to be consistent with
+   struct s3_put_object_callback_data */
+struct s3_get_object_callback_data {
+        FILE *file;
 };
 
 /**
@@ -287,13 +294,22 @@ static int s3_put_object_data_callback(
         int ret = 0;
 
         if (data->content_length) {
-                int toRead = ((data->content_length > (unsigned) buffer_size) ?
+                int to_read = ((data->content_length > (unsigned) buffer_size) ?
                 (unsigned)buffer_size : data->content_length);
-                ret = fread(buffer, 1, toRead, data->infile);
+                ret = fread(buffer, 1, to_read, data->file);
         }
         data->content_length -= ret;
 
         return ret;
+}
+
+static S3Status s3_get_object_data_callback(
+        int buffer_size, const char *buffer, void *callback_data) {
+        FILE *outfile = (FILE *)(((struct s3_cb_data *)callback_data)->data);
+
+        size_t wrote = fwrite(buffer, 1, buffer_size, outfile);
+        return ((wrote < (size_t)buffer_size) ? S3StatusAbortedByCallback :
+                                                S3StatusOK);
 }
 
 /**
@@ -331,13 +347,16 @@ int s3_upload(const char *path) {
 
         /* initialize structure used during  */
         put_object_data.content_length = statbuf.st_size;
-        if (!(put_object_data.infile = fopen(path, "r"))) {
+        if (!(put_object_data.file = fopen(path, "r"))) {
                 /* use thead safe version of strerror() */
                 if (strerror_r(errno, err_buf, ERR_MSG_BUF_LEN) == -1) {
                         err_buf[0] = '\0'; /* very unlikely */
                 }
 
-                LOG(ERROR, "failed to open input file %s: %s", path, err_buf);
+                LOG(ERROR,
+                    "failed to open file in 'r' mode [file: %s; reason: %s]",
+                    path,
+                    err_buf);
 
                 return -1;
         }
@@ -366,7 +385,7 @@ int s3_upload(const char *path) {
                 ret = -1;
         }
 
-        if (fclose(put_object_data.infile)) {
+        if (fclose(put_object_data.file)) {
                 /* this is usually caused by very serious system error */
 
                 /* use thead safe version of strerror() */
@@ -395,7 +414,103 @@ int s3_upload(const char *path) {
                     path,
                     err_buf);
 
+                ret = -1;
+        }
+
+        return ret;
+}
+
+/**
+ * @brief s3_download Downloads file's data from s3 remote storage
+ *                    to local storage.
+ *
+ * @param[in] path Path to file whose data should be downloaded.
+ *
+ * @return  0: file's data has been successfully downloaded
+ *         -1: error happen during file's data download
+ */
+int s3_download(const char *path) {
+        int retries = get_conf()->s3_operation_retries;
+        int ret = 0; /* success by default */
+        struct s3_get_object_callback_data get_object_data;
+
+        /* set call back data type */
+        struct s3_cb_data callback_data = {
+                .type = e_s3_cb_get_object,
+                .error_details = { 0 },
+                .data = &get_object_data,
+        };
+
+        if (!(get_object_data.file = fopen(path, "w"))) {
+                /* use thead safe version of strerror() */
+                if (strerror_r(errno, err_buf, ERR_MSG_BUF_LEN) == -1) {
+                        err_buf[0] = '\0'; /* very unlikely */
+                }
+
+                LOG(ERROR,
+                    "failed to open file in 'w' mode [file: %s; reason: %s]",
+                    path,
+                    err_buf);
+
                 return -1;
+        }
+
+        S3GetObjectHandler get_object_handler = {
+                g_response_handler,
+                &s3_get_object_data_callback
+        };
+
+        do {
+                S3_get_object(&g_bucket_context,
+                              path,
+                              NULL,
+                              0,
+                              0,
+                              NULL,
+                              &get_object_handler,
+                              &callback_data);
+        } while(S3_status_is_retryable(callback_data.status) && --retries);
+
+        /* fail on any error */
+        if (callback_data.status != S3StatusOK) {
+                LOG(ERROR,
+                    "S3_get_object() failed [error: %s]",
+                    S3_get_status_name(callback_data.status));
+                LOG(ERROR, callback_data.error_details);
+
+                ret = -1;
+        }
+
+        if (fclose(get_object_data.file)) {
+                /* this is usually caused by very serious system error */
+
+                /* use thead safe version of strerror() */
+                if (strerror_r(errno, err_buf, ERR_MSG_BUF_LEN) == -1) {
+                        err_buf[0] = '\0'; /* very unlikely */
+                }
+
+                LOG(ERROR, "failed to close file %s: %s", path, err_buf);
+
+                ret = -1;
+        }
+
+        /* remove location attribute */
+        if (removexattr(path, xattr_str[e_s3_object_id]) == -1) {
+                /* non-existance of location attribute indicates an error
+                   in logic of this program */
+
+                /* strerror_r() with very low probability can fail;
+                   ignore such failures */
+                strerror_r(errno, err_buf, ERR_MSG_BUF_LEN);
+
+                LOG(ERROR,
+                    "failed to remove extended attribute %s of file %s "
+                    "[reason: %s]",
+                    xattr_str[e_s3_object_id],
+                    path,
+                    err_buf);
+
+                ret = -1;
         }
 
         return ret;
@@ -467,20 +582,6 @@ int s3_connect(void) {
         LOG(INFO, "access to remote store setup successfully");
 
         return 0;
-}
-
-/**
- * @brief s3_download Downloads file's data from s3 remote storage
- *                    to local storage.
- *
- * @param[in] path Path to file whose data should be downloaded.
- *
- * @return  0: file's data has been successfully downloaded
- *         -1: error happen during file's data download
- */
-int s3_download(const char *path) {
-        /* TODO: need to implement this function */
-        return -1;
 }
 
 /**
