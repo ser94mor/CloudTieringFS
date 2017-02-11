@@ -232,14 +232,33 @@ typedef struct {
 } queue_t;
 
 /* functions to work with queue_t data structure */
-int  queue_init(queue_t **queue_p, size_t queue_max_size, size_t data_max_size);
+int  queue_init(queue_t **queue_p,
+                size_t queue_max_size,
+                size_t data_max_size);
+
+int  queue_init_shm(queue_t **queue_p,
+                    size_t queue_max_size,
+                    size_t data_max_size);
+
 void queue_destroy(queue_t *queue);
 
-int  queue_push(queue_t *queue, const char *data, size_t data_size);
-int  queue_try_push(queue_t *queue, const char *data, size_t data_size);
+void queue_destroy_shm(queue_t *queue);
 
-int  queue_pop(queue_t *queue, char *data, size_t *data_size);
-int  queue_try_pop(queue_t *queue, char *data, size_t *data_size);
+int  queue_push(queue_t *queue,
+                const char *data,
+                size_t data_size);
+
+int  queue_try_push(queue_t *queue,
+                    const char *data,
+                    size_t data_size);
+
+int  queue_pop(queue_t *queue,
+               char *data,
+               size_t *data_size);
+
+int  queue_try_pop(queue_t *queue,
+                   char *data,
+                   size_t *data_size);
 
 
 /*******************************************************************************

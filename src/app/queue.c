@@ -256,6 +256,52 @@ int queue_init(queue_t **queue_p, size_t max_size, size_t data_max_size) {
 }
 
 /**
+ * @brief queue_init Allocates memory for a queue_t data structure and
+ *                   initializes its members.
+ *
+ * @note This function is thread-safe.
+ *
+ * @param[in] max_size      A maximum number of elements in a queue.
+ * @param[in] data_max_size A maximum size of a data allowed to be pushed
+ *                          into the queue.
+ *
+ * @return Pointer to initialized queue_t.
+ */
+int queue_init_shm(queue_t **queue_p, size_t max_size, size_t data_max_size) {
+        /* allocate a memory for a queue_t data structure */
+        queue_t *queue = malloc(sizeof(queue_t));
+        if (queue == NULL) {
+                return -1;
+        }
+
+        /* initialize structure members */
+        queue->max_size = max_size;
+        queue->cur_size = 0;
+        queue->data_max_size = data_max_size;
+
+        queue->buf_size = (sizeof(size_t) + data_max_size) * max_size;
+        queue->buf = malloc(queue->buf_size);
+        if (queue->buf == NULL) {
+                free(queue);
+                return -1;
+        }
+
+        queue->head = (char *)queue->buf;
+        queue->tail = (char *)queue->buf;
+
+        queue->head_mutex = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
+        queue->tail_mutex = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
+        queue->size_mutex = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
+
+        queue->emptiness_cond = (pthread_cond_t)PTHREAD_COND_INITIALIZER;
+        queue->fullness_cond  = (pthread_cond_t)PTHREAD_COND_INITIALIZER;
+
+        *queue_p =  queue;
+
+        return 0;
+}
+
+/**
  * @brief queue_destroy Frees all memory allocated for a given queue.
  *
  * @warning This function is not thread-safe.
