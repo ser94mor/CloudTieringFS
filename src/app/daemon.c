@@ -144,7 +144,8 @@ static int init_data(pair_t *dow_queue_pair,
 
         if (queue_init((queue_t **)&(dow_queue_pair->first),
                        conf->primary_download_queue_max_size,
-                       conf->path_max) == -1) {
+                       conf->path_max,
+                       NULL) == -1) {
                 LOG(ERROR,
                     "unable to allocate memory for primary download queue");
                 return -1;
@@ -152,7 +153,8 @@ static int init_data(pair_t *dow_queue_pair,
 
         if (queue_init((queue_t **)&(dow_queue_pair->second),
                        conf->secondary_download_queue_max_size,
-                       conf->path_max) == -1) {
+                       conf->path_max,
+                       NULL) == -1) {
                 LOG(ERROR,
                     "unable to allocate memory for secondary download queue");
 
@@ -168,7 +170,8 @@ static int init_data(pair_t *dow_queue_pair,
 
         if (queue_init((queue_t **)&(upl_queue_pair->second),
                        conf->secondary_upload_queue_max_size,
-                       conf->path_max) == -1) {
+                       conf->path_max,
+                       NULL) == -1) {
                 LOG(ERROR,
                     "unable to allocate memory for secondary upload queue");
 

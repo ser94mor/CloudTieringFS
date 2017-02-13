@@ -219,6 +219,8 @@ typedef struct {
         /* a size in byte of a buffer where elements are stored */
         size_t buf_size;
 
+        const char *shm_obj;
+
         /* a mutex to ensure a thread-safety property */
         pthread_mutex_t head_mutex;
 
@@ -234,15 +236,10 @@ typedef struct {
 /* functions to work with queue_t data structure */
 int  queue_init(queue_t **queue_p,
                 size_t queue_max_size,
-                size_t data_max_size);
-
-int  queue_init_shm(queue_t **queue_p,
-                    size_t queue_max_size,
-                    size_t data_max_size);
+                size_t data_max_size,
+                const char *shm_obj);
 
 void queue_destroy(queue_t *queue);
-
-void queue_destroy_shm(queue_t *queue);
 
 int  queue_push(queue_t *queue,
                 const char *data,

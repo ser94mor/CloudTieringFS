@@ -123,7 +123,7 @@ static int test_queue_api(char *err_msg, queue_t **queue_p) {
         size_t data_size = DATA_MAX_SIZE;
         char data[data_size];
 
-        if (queue_init(&queue, QUEUE_MAX_SIZE, DATA_MAX_SIZE)) {
+        if (queue_init(&queue, QUEUE_MAX_SIZE, DATA_MAX_SIZE, NULL)) {
                 strcpy(err_msg, "[queue_init] should not fail with correct "
                                 "input args");
                 goto err;
@@ -319,7 +319,7 @@ static void *supplier_routine(void *args) {
 static int test_queue_parallel_access(char *err_msg, queue_t **queue_p) {
         queue_t *queue = NULL;
 
-        if (queue_init(&queue, QUEUE_MAX_SIZE, DATA_MAX_SIZE)) {
+        if (queue_init(&queue, QUEUE_MAX_SIZE, DATA_MAX_SIZE, NULL)) {
                 strcpy(err_msg, "[queue_init] should not fail with correct "
                                 "input args");
                 *queue_p = queue;
