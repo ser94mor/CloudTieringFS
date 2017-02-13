@@ -7,9 +7,10 @@ and a cloud object storage at the file level while maintaining the POSIX semanti
 TODO
 
 ### Dependencies
-libs3
-dotconf
-libcap-progs
+libs3  
+dotconf 
+gcc5   
+libcap-progs - planned
 
 ### Licensing
 **cloudtiering** is licensed under the [GNU General Public License, Version 3](LICENSE.md).
