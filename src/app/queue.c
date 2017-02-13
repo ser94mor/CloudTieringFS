@@ -14,11 +14,14 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+#define  _BSD_SOURCE        /* needed for MAP_ANONYMOUS from sys/mman.h */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <pthread.h>
+#include <sys/mman.h>
 #include <sys/types.h>
 
 #include "cloudtiering.h"
@@ -212,48 +215,72 @@ int queue_try_pop(queue_t *queue,
 /**
  * @brief queue_init Allocates memory for a queue_t data structure and
  *                   initializes its members.
- *
- * @note This function is thread-safe.
- *
- * @param[in] max_size      A maximum number of elements in a queue.
- * @param[in] data_max_size A maximum size of a data allowed to be pushed
- *                          into the queue.
- *
- * @return Pointer to initialized queue_t.
  */
 int queue_init(queue_t **queue_p,
                size_t max_size,
                size_t data_max_size,
                const char *shm_obj) {
-        /* allocate a memory for a queue_t data structure */
-        queue_t *queue = malloc(sizeof(queue_t));
-        if (queue == NULL) {
+        /* get page size value to properly align queue_t structure and
+           queue->buf in memory */
+        long val = sysconf(_SC_PAGESIZE);
+        if (val == -1) {
                 return -1;
         }
+
+        size_t page_size            = (size_t)val;
+        size_t queue_t_size         = sizeof(queue_t);
+        size_t queue_t_size_aligned = queue_t_size + (queue_t_size % page_size);
+        size_t buf_size             = (sizeof(size_t) + data_max_size) *
+                                      max_size;
+        size_t buf_size_aligned     = buf_size + (buf_size % page_size);
+
+        /* total size of memory to be allocated */
+        size_t total_size_aligned = queue_t_size_aligned + buf_size_aligned;
+
+        void *mem_region = NULL;
+        if (shm_obj == NULL) {
+                /* queue will be used only by callee */
+                mem_region = mmap(NULL,                        /* addr */
+                                  total_size_aligned,          /* len */
+                                  PROT_READ | PROT_WRITE,      /* prot */
+                                  MAP_PRIVATE | MAP_ANONYMOUS, /* flags */
+                                  -1,                          /* fd */
+                                  0);                          /* offset */
+                if (mem_region == MAP_FAILED) {
+                        return -1;
+                }
+        } else {
+                /* queue will be used by many processes */
+                /* TODO */
+        }
+
+        queue_t *queue = mem_region;
 
         /* initialize structure members */
         queue->max_size = max_size;
         queue->cur_size = 0;
         queue->data_max_size = data_max_size;
+        queue->total_size = total_size_aligned;
 
         queue->buf_size = (sizeof(size_t) + data_max_size) * max_size;
-        queue->buf = malloc(queue->buf_size);
-        if (queue->buf == NULL) {
-                free(queue);
-                return -1;
-        }
+        queue->buf = (char *)queue + queue_t_size_aligned;
 
         queue->head = (char *)queue->buf;
         queue->tail = (char *)queue->buf;
 
-        queue->shm_obj = shm_obj;
+        if (shm_obj == NULL) {
+                memset(queue->shm_obj, '\0', sizeof(queue->shm_obj));
 
-        queue->head_mutex = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
-        queue->tail_mutex = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
-        queue->size_mutex = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
+                queue->head_mutex = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
+                queue->tail_mutex = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
+                queue->size_mutex = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
 
-        queue->emptiness_cond = (pthread_cond_t)PTHREAD_COND_INITIALIZER;
-        queue->fullness_cond  = (pthread_cond_t)PTHREAD_COND_INITIALIZER;
+                queue->emptiness_cond = (pthread_cond_t)PTHREAD_COND_INITIALIZER;
+                queue->fullness_cond  = (pthread_cond_t)PTHREAD_COND_INITIALIZER;
+        } else {
+                /* memcpy(queue->shm_obj, shm_obj, sizeof(shm_obj)); */
+                /* TODO */
+        }
 
         *queue_p =  queue;
 
@@ -272,8 +299,9 @@ void queue_destroy(queue_t *queue) {
                 return;
         }
 
-        free((char *)queue->buf);
-        free(queue);
+        if (munmap(queue, queue->total_size) == -1) {
+                /* queue structure is corrupted */
+        }
 }
 
 

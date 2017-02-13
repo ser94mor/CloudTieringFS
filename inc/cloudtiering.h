@@ -194,6 +194,7 @@ typedef struct {
 
 /* inclusions of third-parties */
 #include <pthread.h>      /* included for a pthread_mutex_t type definition */
+#include <linux/limits.h>
 #include <sys/types.h>    /* included for a size_t type definition */
 
 /* a definition of a queue data structure */
@@ -219,7 +220,9 @@ typedef struct {
         /* a size in byte of a buffer where elements are stored */
         size_t buf_size;
 
-        const char *shm_obj;
+        char shm_obj[NAME_MAX];
+
+        size_t total_size;
 
         /* a mutex to ensure a thread-safety property */
         pthread_mutex_t head_mutex;
