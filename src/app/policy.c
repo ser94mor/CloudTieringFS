@@ -21,6 +21,7 @@ static queue_t *out_queue = NULL;
 static int update_evict_queue(const char *fpath, const struct stat *sb,  int typeflag, struct FTW *ftwbuf) {
 
         struct stat path_stat;
+        /* TODO: consider using lstat */
         if (stat(fpath, &path_stat) == -1) {
                 /* just continue with the next files; non-zero will
                    cause failure of nftw() */
