@@ -21,6 +21,8 @@
 #include <string.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <fcntl.h>          /* defines O_* constants */
+#include <sys/stat.h>       /* defines mode constants */
 #include <sys/mman.h>
 #include <sys/types.h>
 
@@ -251,7 +253,48 @@ int queue_init(queue_t **queue_p,
                 }
         } else {
                 /* queue will be used by many processes */
-                /* TODO */
+
+                /* create shared memory object */
+                int fd = shm_open(shm_obj,
+                                  O_CREAT | O_EXCL | O_RDWR,
+                                  S_IRUSR | S_IWUSR | S_IRGRP |
+                                  S_IWGRP | S_IROTH | S_IWOTH);
+                if (fd == -1) {
+                        return -1;
+                }
+
+                /* set size equal to all memory needed for queue and
+                   its buffer */
+                if (ftruncate(fd, total_size_aligned) == -1) {
+                        /* do not check shm_unlink() and close() errors because
+                           here we are already failed */
+                        close(fd);
+                        shm_unlink(shm_obj);
+                        return -1;
+                }
+
+                mem_region = mmap(NULL,                        /* addr */
+                                  total_size_aligned,          /* len */
+                                  PROT_READ | PROT_WRITE,      /* prot */
+                                  MAP_SHARED,                  /* flags */
+                                  fd,                          /* fd */
+                                  0);                          /* offset */
+                if (mem_region == MAP_FAILED) {
+                        /* do not check shm_unlink() and close() errors because
+                           here we are already failed */
+                        close(fd);
+                        shm_unlink(shm_obj);
+                        return -1;
+                }
+
+                /* no longer needed */
+                if (close(fd) == -1) {
+                        /* close() error usually indicates serious
+                           system problem */
+                        munmap(mem_region, total_size_aligned);
+                        shm_unlink(shm_obj);
+                        return -1;
+                }
         }
 
         queue_t *queue = mem_region;
@@ -269,17 +312,35 @@ int queue_init(queue_t **queue_p,
         queue->tail = (char *)queue->buf;
 
         if (shm_obj == NULL) {
-                memset(queue->shm_obj, '\0', sizeof(queue->shm_obj));
+                queue->shm_obj[0] = '\0'; /* empty string */
 
                 queue->head_mutex = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
                 queue->tail_mutex = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
                 queue->size_mutex = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
 
-                queue->emptiness_cond = (pthread_cond_t)PTHREAD_COND_INITIALIZER;
-                queue->fullness_cond  = (pthread_cond_t)PTHREAD_COND_INITIALIZER;
+                queue->emptiness_cond =
+                        (pthread_cond_t)PTHREAD_COND_INITIALIZER;
+                queue->fullness_cond  =
+                        (pthread_cond_t)PTHREAD_COND_INITIALIZER;
         } else {
-                /* memcpy(queue->shm_obj, shm_obj, sizeof(shm_obj)); */
-                /* TODO */
+                strcpy(queue->shm_obj, shm_obj);
+
+                pthread_mutexattr_t mutex_attr;
+                pthread_condattr_t  cond_attr;
+
+                pthread_mutexattr_init(&mutex_attr);
+                pthread_condattr_init(&cond_attr);
+
+                pthread_mutexattr_setpshared(&mutex_attr,
+                                             PTHREAD_PROCESS_SHARED);
+                pthread_condattr_setpshared(&cond_attr, PTHREAD_PROCESS_SHARED);
+
+                pthread_mutex_init(&(queue->head_mutex), &mutex_attr);
+                pthread_mutex_init(&(queue->tail_mutex), &mutex_attr);
+                pthread_mutex_init(&(queue->size_mutex), &mutex_attr);
+
+                pthread_cond_init(&(queue->emptiness_cond), &cond_attr);
+                pthread_cond_init(&(queue->fullness_cond),  &cond_attr);
         }
 
         *queue_p =  queue;
@@ -297,6 +358,10 @@ int queue_init(queue_t **queue_p,
 void queue_destroy(queue_t *queue) {
         if (queue == NULL) {
                 return;
+        }
+
+        if (strlen(queue->shm_obj) && (shm_unlink(queue->shm_obj) == -1)) {
+                /* something is wrong with shared memory object */
         }
 
         if (munmap(queue, queue->total_size) == -1) {

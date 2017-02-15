@@ -65,16 +65,16 @@ all: app lib tst validate
 
 
 app: mkdir-${BIN_DIR}/${APP_SUBDIR} ${APP_OBJ}
-	${GCC} -pthread ${APP_OBJ} -o ${BIN_DIR}/${APP_NAME} -ldotconf -ls3
+	${GCC} -pthread ${APP_OBJ} -o ${BIN_DIR}/${APP_NAME} -ldotconf -ls3 -lrt
 
 
 lib: mkdir-${BIN_DIR}/${LIB_SUBDIR} ${LIB_OBJ}
-	${GCC} -pthread -shared -Wl,-soname,${LIB_SONAME} ${LIB_OBJ} -o ${BIN_DIR}/${LIB_NAME} -ldl
+	${GCC} -pthread -shared -Wl,-soname,${LIB_SONAME} ${LIB_OBJ} -o ${BIN_DIR}/${LIB_NAME} -ldl -lrt
 	ln --symbolic --force ${LIB_NAME} ${BIN_DIR}/${LIB_SONAME}
 
 
 tst: mkdir-${BIN_DIR}/${TST_SUBDIR} ${APP_OBJ} ${TST_OBJ}
-	${GCC} -pthread ${TST_OBJ} $(filter-out ${BIN_DIR}/${APP_SUBDIR}/daemon.o,${APP_OBJ}) -o ${BIN_DIR}/${TST_NAME} -ldotconf -ls3
+	${GCC} -pthread ${TST_OBJ} $(filter-out ${BIN_DIR}/${APP_SUBDIR}/daemon.o,${APP_OBJ}) -o ${BIN_DIR}/${TST_NAME} -ldotconf -ls3 -lrt
 
 
 validate: lib app tst mkdir-${BIN_DIR}/validate
