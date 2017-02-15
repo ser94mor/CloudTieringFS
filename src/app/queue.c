@@ -24,6 +24,7 @@
 #include <fcntl.h>          /* defines O_* constants */
 #include <sys/stat.h>       /* defines mode constants */
 #include <sys/mman.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 
 #include "cloudtiering.h"
@@ -241,7 +242,7 @@ int queue_init(queue_t **queue_p,
 
         void *mem_region = NULL;
         if (shm_obj == NULL) {
-                /* queue will be used only by callee */
+                /* queue will be used only by caller */
                 mem_region = mmap(NULL,                        /* addr */
                                   total_size_aligned,          /* len */
                                   PROT_READ | PROT_WRITE,      /* prot */

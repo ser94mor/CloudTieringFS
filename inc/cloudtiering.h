@@ -220,7 +220,7 @@ typedef struct {
         /* a size in byte of a buffer where elements are stored */
         size_t buf_size;
 
-        char shm_obj[NAME_MAX];
+        char shm_obj[NAME_MAX + 1];
 
         size_t total_size;
 
