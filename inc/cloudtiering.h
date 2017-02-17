@@ -199,11 +199,9 @@ typedef struct {
 
 /* a definition of a queue data structure */
 typedef struct {
-        /* a pointer to the front element of a queue */
-        char  *head;
+        size_t  head_offset;
 
-        /* a pointer to a back element of a queue */
-        char  *tail;
+        size_t  tail_offset;
 
         /* a current queue's size */
         size_t cur_size;
@@ -214,8 +212,7 @@ typedef struct {
         /* a data's maximum size */
         size_t data_max_size;
 
-        /* a pointer to a buffer where elements are stored */
-        const char  *buf;
+        size_t buf_offset;
 
         /* a size in byte of a buffer where elements are stored */
         size_t buf_size;

@@ -56,7 +56,7 @@ static inline size_t queue_bytes_per_elem(const queue_t *queue) {
  * @return a pointer to an end of queue's buffer
  */
 static inline const char *queue_buf_end(const queue_t *queue) {
-        return (queue->buf + queue->buf_size);
+        return (((char *)queue) + queue->buf_offset + queue->buf_size);
 }
 
 /**
@@ -87,6 +87,18 @@ static inline char *queue_elem_data(const char *elem) {
         return ((char *)elem + sizeof(size_t));
 }
 
+static inline char *queue_buf_beg(const queue_t *queue) {
+        return (((char *)queue) + queue->buf_offset);
+}
+
+static inline char *queue_head(const queue_t *queue) {
+        return (((char *)queue) + queue->head_offset);
+}
+
+static inline char *queue_tail(const queue_t *queue) {
+        return (((char *)queue) + queue->tail_offset);
+}
+
 static int queue_push_common(queue_t *queue,
                              const char *data,
                              size_t data_size,
@@ -113,8 +125,11 @@ static int queue_push_common(queue_t *queue,
         pthread_mutex_unlock(&queue->size_mutex);
 
         /* a begining and an end of a buffer are logically identical */
-        char *ptr = (queue->tail == queue_buf_end(queue)) ?
-                                (char *)queue->buf : (char *)queue->tail;
+        queue->tail_offset = (queue->tail_offset ==
+                             (queue->buf_offset + queue->buf_size)) ?
+                             queue->buf_offset : queue->tail_offset;
+
+        char *ptr = queue_tail(queue);
 
         /* fill an element's space in buffer with a size of the data
            and the data itself */
@@ -122,7 +137,7 @@ static int queue_push_common(queue_t *queue,
         memcpy(queue_elem_data(ptr), data, data_size);
 
         /* update the queue's internal state */
-        queue->tail = (char *)(ptr + queue_bytes_per_elem(queue));
+        queue->tail_offset += queue_bytes_per_elem(queue);
 
         pthread_mutex_lock(&queue->size_mutex);
 
@@ -168,7 +183,7 @@ static int queue_pop_common(queue_t *queue,
 
         pthread_mutex_unlock(&queue->size_mutex);
 
-        size_t elem_sz = queue_elem_size(queue->head);
+        size_t elem_sz = queue_elem_size(queue_head(queue));
 
         /* handle situation when provided buffer is not big enough */
         if (*data_size < elem_sz) {
@@ -180,14 +195,15 @@ static int queue_pop_common(queue_t *queue,
         *data_size = elem_sz;
 
         /* copy data to provided buffer */
-        memcpy(data, queue_elem_data(queue->head), *data_size);
+        memcpy(data, queue_elem_data(queue_head(queue)), *data_size);
 
         /* a begining and an end of a buffer are logically identical;
            update the queue's internal state */
-        queue->head = (queue->head ==
-                       (queue_buf_end(queue) - queue_bytes_per_elem(queue))) ?
-                           (char *)queue->buf :
-                           (char *)queue->head + queue_bytes_per_elem(queue);
+        queue->head_offset = (queue->head_offset ==
+                             (queue->buf_offset + queue->buf_size -
+                             queue_bytes_per_elem(queue))) ?
+                             queue->buf_offset :
+                             queue->head_offset + queue_bytes_per_elem(queue);
 
         pthread_mutex_lock(&queue->size_mutex);
 
@@ -307,10 +323,10 @@ int queue_init(queue_t **queue_p,
         queue->total_size = total_size_aligned;
 
         queue->buf_size = (sizeof(size_t) + data_max_size) * max_size;
-        queue->buf = (char *)queue + queue_t_size_aligned;
+        queue->buf_offset = queue_t_size_aligned;
 
-        queue->head = (char *)queue->buf;
-        queue->tail = (char *)queue->buf;
+        queue->head_offset = queue_t_size_aligned;
+        queue->tail_offset = queue_t_size_aligned;
 
         if (shm_obj == NULL) {
                 queue->shm_obj[0] = '\0'; /* empty string */
