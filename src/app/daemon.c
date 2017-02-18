@@ -145,7 +145,7 @@ static int init_data(pair_t *dow_queue_pair,
         if (queue_init((queue_t **)&(dow_queue_pair->first),
                        conf->primary_download_queue_max_size,
                        conf->path_max,
-                       NULL) == -1) {
+                       QUEUE_SHM_OBJ) == -1) {
                 LOG(ERROR,
                     "unable to allocate memory for primary download queue");
                 return -1;

@@ -197,6 +197,8 @@ typedef struct {
 #include <linux/limits.h>
 #include <sys/types.h>    /* included for a size_t type definition */
 
+#define QUEUE_SHM_OBJ    "/cloudtiering"
+
 /* a definition of a queue data structure */
 typedef struct {
         size_t  head_offset;
