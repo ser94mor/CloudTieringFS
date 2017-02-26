@@ -27,22 +27,15 @@
 
 #include "cloudtiering.h"
 
+/* +1 is for '\0' character */
+#define S3_XATTR_KEY     "s3_object_id"
+#define S3_XATTR_SIZE    S3_MAX_KEY_SIZE + 1
 
 /* buffer to store error messages (mostly errno messages) */
 static __thread char err_buf[ERR_MSG_BUF_LEN];
 
-/* declare array of extended attributes' keys */
-static const char *xattr_str[] = {
-        XATTRS(XATTR_KEY, COMMA),
-};
-
-/* declare array of extended attributes' sizes */
-static size_t xattr_max_size[] = {
-        XATTRS(XATTR_MAX_SIZE, COMMA),
-};
-
-/* declare types of extended attributes' values */
-XATTRS(DECLARE_XATTR_TYPE, SEMICOLON);
+/* buffer to store file's s3 identifiers */
+static __thread char s3_xattr_buf[S3_XATTR_SIZE];
 
 /*  context for working with objects within a bucket; initialized only once */
 static S3BucketContext g_bucket_context;
@@ -288,7 +281,7 @@ static int s3_create_bucket(void) {
 static int s3_put_object_data_callback(
         int buffer_size, char *buffer, void *callback_data) {
         struct s3_put_object_callback_data *data =
-        (struct s3_put_object_callback_data *)
+            (struct s3_put_object_callback_data *)
                                    (((struct s3_cb_data *)callback_data)->data);
 
         int ret = 0;
@@ -397,11 +390,10 @@ int s3_upload(const char *path) {
                 ret = -1;
         }
 
-        const char *key = xattr_str[e_s3_object_id];
-        xattr_s3_object_id_t value = (xattr_s3_object_id_t)path;
+        const char *key = "object_id";
+        char *value = get_ops()->get_xattr_value(path);
 
-        if (setxattr(path, key, value, xattr_max_size[e_s3_object_id],
-                     XATTR_CREATE) == -1) {
+        if (setxattr(path, key, value, S3_XATTR_SIZE, XATTR_CREATE) == -1) {
                 /* strerror_r() with very low probability can fail;
                    ignore such failures */
                 strerror_r(errno, err_buf, ERR_MSG_BUF_LEN);
@@ -495,7 +487,7 @@ int s3_download(const char *path) {
         }
 
         /* remove location attribute */
-        if (removexattr(path, xattr_str[e_s3_object_id]) == -1) {
+        if (removexattr(path, "object_id") == -1) {
                 /* non-existance of location attribute indicates an error
                    in logic of this program */
 
@@ -506,7 +498,7 @@ int s3_download(const char *path) {
                 LOG(ERROR,
                     "failed to remove extended attribute %s of file %s "
                     "[reason: %s]",
-                    xattr_str[e_s3_object_id],
+                    "object_id",
                     path,
                     err_buf);
 
@@ -589,4 +581,26 @@ int s3_connect(void) {
  */
 void s3_disconnect(void) {
         S3_deinitialize();
+}
+
+char *s3_get_xattr_value(const char *path) {
+        /* TODO: implement this function later using near-perfect hash function
+                 to compress long paths to keys no more then
+                 S3_MAX_KEY_SIZE in length */
+
+        size_t path_len = strlen(path);
+        size_t key_len  = ( path_len > S3_MAX_KEY_SIZE ) ?
+                          S3_MAX_KEY_SIZE : path_len;
+
+        size_t pos = 0;
+        for (; pos < key_len; pos++) {
+                s3_xattr_buf[pos] = path[key_len - pos - 1];
+        }
+        s3_xattr_buf[pos] = '\0';
+
+        return s3_xattr_buf;
+}
+
+size_t s3_get_xattr_size(void) {
+        return S3_XATTR_SIZE;
 }

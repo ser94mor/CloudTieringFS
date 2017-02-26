@@ -15,6 +15,8 @@
  * Scan filesystem *
  * *****************/
 
+#define EVICTION_TIMEOUT    30
+
 static queue_t *in_queue  = NULL;
 static queue_t *out_queue = NULL;
 
@@ -30,7 +32,7 @@ static int update_evict_queue(const char *fpath, const struct stat *sb,  int typ
 
         if (is_valid_path(fpath) &&
             is_file_local(fpath) &&
-            (path_stat.st_atime + 600) < time(NULL)) {
+            (path_stat.st_atime + EVICTION_TIMEOUT) < time(NULL)) {
 
                 char *data = (char *)fpath;
                 size_t data_size = strlen(fpath) + 1;

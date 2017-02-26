@@ -289,18 +289,18 @@ int read_conf(const char *conf_path) {
                 return -1;
         }
 
-        configfile_t *configfile;
+        configfile_t *config_file;
 
-        configfile = dotconf_create((char *)conf_path, options, NULL, NONE);
-        if (!configfile) {
+        config_file = dotconf_create((char *)conf_path, options, NULL, NONE);
+        if (!config_file) {
                 return -1;
         }
 
-        if (dotconf_command_loop(configfile) == 0) {
+        if (dotconf_command_loop(config_file) == 0) {
                 return -1;
         }
 
-        dotconf_cleanup(configfile);
+        dotconf_cleanup(config_file);
 
         return 0;
 }

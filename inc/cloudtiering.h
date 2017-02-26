@@ -299,71 +299,39 @@ enum section_enum {
 #define PROTOCOLS(action, sep) \
         action(s3)
 
-/* a macro-function to declare ops_t data-structure for a given protocol */
-#define DECLARE_OPS(elem)                       \
-        static ops_t elem##_ops = {             \
-                .type       = ENUMERIZE(elem),  \
-                .connect    = elem##_connect,   \
-                .download   = elem##_download,  \
-                .upload     = elem##_upload,    \
-                .disconnect = elem##_disconnect \
-        }
-
 /* enum of supported protocols */
 enum protocol_enum {
         PROTOCOLS(ENUMERIZE, COMMA),
 };
 
-/* the constant representing extended attributes namespace */
-#define XATTR_NAMESPACE             "trusted"
-
-/* constants (identifiers) representing local and remote storages */
-#define LOCAL_STORAGE                 0x01
-#define REMOTE_STORAGE                0x10
-
-/* a list of all possible extended attributes with sizes in bytes and types of
-   their values;
-   - s3_object_id's size is taken from documentation:
-     http://docs.aws.amazon.com/AmazonS3/latest/dev/UsingMetadata.html;
-   - location's value should be able to store *_STORAGE values;
-   - locked attribute does not have value, so its size is 0 */
-#define XATTRS(action, sep)                                            \
-                                                                       \
-        /* specific for s3 protocol */                                 \
-        action(s3_object_id, 1024, char *)                         sep \
-                                                                       \
-        /* common to all remote storage protocols */                   \
-        action(location, sizeof(unsigned char), unsigned char)     sep \
-        action(locked, 0, void)
-
-/* a macro-function producing full name of extended attribute */
-#define XATTR_KEY(key, size, type) \
-        XATTR_NAMESPACE "." PROGRAM_NAME "." STRINGIFY(key)
-
-/* a macro-fucntion to get size in bytes of extended attribute's value */
-#define XATTR_MAX_SIZE(key, size, type)         size
-
-/* a macro-function to declare type of extended attribute's value */
-#define DECLARE_XATTR_TYPE(key, size, type)     typedef type xattr_##key##_t
-
-/* enum of supported extended attributes */
-enum xattr_enum {
-        XATTRS(ENUMERIZE, COMMA),
-};
-
+/* a macro-function to declare ops_t data-structure for a given protocol */
+#define DECLARE_OPS(elem)                                       \
+        static ops_t elem##_ops = {                             \
+                .protocol        = ENUMERIZE(elem),             \
+                .connect         = elem##_connect,              \
+                .download        = elem##_download,             \
+                .upload          = elem##_upload,               \
+                .disconnect      = elem##_disconnect,           \
+                .get_xattr_value = elem##_get_xattr_value,      \
+                .get_xattr_size  = elem##_get_xattr_size,       \
+        }
 
 typedef struct {
-        enum xattr_enum type;
-        int  (*connect)(void);
-        int  (*download)(const char *path);
-        int  (*upload)(const char *path);
-        void (*disconnect)(void);
+        enum protocol_enum protocol;
+        int    (*connect)(void);
+        int    (*download)(const char *path);
+        int    (*upload)(const char *path);
+        void   (*disconnect)(void);
+        char  *(*get_xattr_value)(const char *path);
+        size_t (*get_xattr_size)(void);
 } ops_t;
 
-int  s3_connect(void);
-int  s3_download(const char *path);
-int  s3_upload(const char *path);
-void s3_disconnect(void);
+int    s3_connect(void);
+int    s3_download(const char *path);
+int    s3_upload(const char *path);
+void   s3_disconnect(void);
+char  *s3_get_xattr_value(const char *path);
+size_t s3_get_xattr_size(void);
 
 int download_file(const char *path);
 int upload_file(const char *path);

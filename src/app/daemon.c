@@ -251,6 +251,8 @@ static int start_routines(pair_t    *dow_queue_pair,
 }
 
 int main(int argc, char *argv[]) {
+        /* TODO: add check that extended attributes are supported */
+
         pair_t dow_queue_pair;
         pair_t upl_queue_pair;
 

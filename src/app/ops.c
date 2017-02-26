@@ -33,6 +33,23 @@
 
 #include "cloudtiering.h"
 
+/* the constant representing extended attributes namespace */
+#define XATTR_NAMESPACE             "trusted"
+
+/* a list of all possible extended attributes */
+#define XATTRS(action, sep)                                \
+        action(stub)        sep \
+        action(locked)      sep \
+        action(object_id)
+
+/* a macro-function producing full name of extended attribute */
+#define XATTR_KEY(elem) \
+        XATTR_NAMESPACE "." PROGRAM_NAME "." STRINGIFY(elem)
+
+/* enum of supported extended attributes */
+enum xattr_enum {
+        XATTRS(ENUMERIZE, COMMA),
+};
 
 /* buffer to store error messages (mostly errno messages) */
 static __thread char err_buf[ERR_MSG_BUF_LEN];
@@ -42,16 +59,94 @@ static const char *xattr_str[] = {
         XATTRS(XATTR_KEY, COMMA),
 };
 
-/* declare array of extended attributes' sizes */
-static size_t xattr_max_size[] = {
-        XATTRS(XATTR_MAX_SIZE, COMMA),
-};
+static int set_xattr( const char *path,
+                      enum xattr_enum xattr,
+                      void *value,
+                      size_t value_size,
+                      int flags) {
 
-/* declare types of extended attributes' values */
-XATTRS(DECLARE_XATTR_TYPE, SEMICOLON);
+        if ( setxattr( path,
+                       xattr_str[xattr],
+                       value,
+                       value_size,
+                       flags ) == -1 ) {
+
+                /* strerror_r() with very low probability can fail;
+                 *          ignore such failures */
+                strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
+
+                LOG( ERROR,
+                     "failed to set extended attribute %s to file %s "
+                     "[reason: %s]",
+                     xattr_str[e_locked],
+                     path,
+                     err_buf );
+
+                return -1;
+        }
+
+        return 0;
+}
+
+static int get_xattr_tunable( const char *path,
+                              enum xattr_enum xattr,
+                              void  *value,
+                              size_t value_size,
+                              int ignore_enoattr ) {
+        if ( getxattr( path, xattr_str[xattr], value, value_size ) == -1 ) {
+                if ( ignore_enoattr && (errno == ENOATTR) ) {
+                        return 1; /* no error, but value is special */
+                }
+
+                /* strerror_r() with very low probability can fail;
+                 *          ignore such failures */
+                strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
+
+                LOG( ERROR,
+                     "failed to get extended attribute %s of file %s "
+                     "[reason: %s]",
+                     xattr_str[xattr],
+                     path,
+                     err_buf );
+
+                return -1; /* error indication */
+        }
+
+        return 0;
+}
+
+static int remove_xattr_tunable( const char *path,
+                                 enum xattr_enum xattr,
+                                 int ignore_enoattr ) {
+
+        if ( removexattr( path, xattr_str[xattr] ) == -1 ) {
+                if (  ignore_enoattr && ( errno == ENOATTR ) ) {
+                        return 0;
+                }
+
+                /* strerror_r() with very low probability can fail;
+                 *          ignore such failures */
+                strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
+
+                LOG( ERROR,
+                     "failed to remove extended attribute %s of file %s "
+                     "[reason: %s]",
+                     xattr_str[xattr],
+                     path,
+                     err_buf );
+
+                return -1;
+        }
+
+        return 0;
+}
+
+static inline int remove_xattr( const char *path, enum xattr_enum xattr ) {
+        return remove_xattr_tunable( path, xattr, 0 );
+}
 
 /**
- * @brief lock_file Lock file using extended attribute as an indicator.
+ * @brief try_lock_file Lock file using extended attribute as an indicator.
  *
  * @note Operation is atomic according to
  *       http://man7.org/linux/man-pages/man7/xattr.7.html.
@@ -62,32 +157,11 @@ XATTRS(DECLARE_XATTR_TYPE, SEMICOLON);
  *         -1: file was not locked due to failure or lock was already set on
  *             this file previously
  */
-static int lock_file(const char *path) {
-        int ret = setxattr(path, xattr_str[e_locked], NULL, 0, XATTR_CREATE);
-
-        if (ret == -1) {
-                if (errno == EEXIST) {
-                        /* file is already locked; this is not a system error
-                           but a caller of this function should not proceed
-                           futher with his actions */
-                        LOG(DEBUG,
-                            "unable to lock file %s; it is already locked",
-                            path);
-
-                        return -1;
-                }
-
-                /* strerror_r() with very low probability can fail;
-                   ignore such failures */
-                strerror_r(errno, err_buf, ERR_MSG_BUF_LEN);
-
-                LOG(ERROR,
-                    "failed to set extended attribute %s to file %s "
-                    "[reason: %s]",
-                    xattr_str[e_locked],
-                    path,
-                    err_buf);
-
+static int try_lock_file( const char *path ) {
+        if ( set_xattr( path, e_locked, NULL, 0, XATTR_CREATE ) == -1 ) {
+                /* lock file failures is normal, since another thread or
+                   procces may already holding a lock */
+                LOG( DEBUG, "failed to lock file %s", path );
                 return -1;
         }
 
@@ -106,23 +180,10 @@ static int lock_file(const char *path) {
  *         -1: file was not unlocked due to failure
  */
 static int unlock_file(const char *path) {
-        int ret = removexattr(path, xattr_str[e_locked]);
+        if ( remove_xattr(path, e_locked) == -1 ) {
+                /* NOTE: impossible case in case program's logic is correct */
 
-        if (ret == -1) {
-                /* non-existance of lock indicates an error in logic
-                   of this program */
-
-                /* strerror_r() with very low probability can fail;
-                   ignore such failures */
-                strerror_r(errno, err_buf, ERR_MSG_BUF_LEN);
-
-                LOG(ERROR,
-                    "failed to remove extended attribute %s of file %s "
-                    "[reason: %s]",
-                    xattr_str[e_locked],
-                    path,
-                    err_buf);
-
+                LOG( ERROR, "failed to unlock file %s", path );
                 return -1;
         }
 
@@ -141,31 +202,10 @@ static int unlock_file(const char *path) {
  *          0: if file is in remote storage
  *         -1: error happen during an attempt to get extended attribute's value
  */
-int is_file_local(const char *path) {
-        size_t size = xattr_max_size[e_location];
-        const char *xattr = xattr_str[e_location];
-        xattr_location_t loc = 0;
-
-        if (getxattr(path, xattr, &loc, size) == -1) {
-                if (errno == ENOATTR) {
-                        return 1; /* true */
-                }
-
-                /* strerror_r() with very low probability can fail;
-                   ignore such failures */
-                strerror_r(errno, err_buf, ERR_MSG_BUF_LEN);
-
-                LOG(ERROR,
-                    "failed to get extended attribute %s of file %s "
-                    "[reason: %s]",
-                    xattr,
-                    path,
-                    err_buf);
-
-                return -1; /* error indication */
-        }
-
-        return !!(loc == LOCAL_STORAGE);
+int is_file_local( const char *path ) {
+        /* in case stub attribute is not set returns 1,
+           if set returns 0, on error returns -1 */
+        return get_xattr_tunable( path, e_stub, NULL, 0, 1 );
 }
 
 /**
@@ -177,9 +217,9 @@ int is_file_local(const char *path) {
  * @return 1: if path is valid
  *         0: if path is not valid
  */
-int is_valid_path(const char *path) {
+int is_valid_path( const char *path ) {
         struct stat path_stat;
-        if ((stat(path, &path_stat) == -1) || !S_ISREG(path_stat.st_mode)) {
+        if ( (stat(path, &path_stat) == -1) || !S_ISREG(path_stat.st_mode) ) {
                 return 0; /* false */
         }
 
@@ -195,90 +235,103 @@ int is_valid_path(const char *path) {
  *         -1: file has not been upload due to error or access to file
  *             has happen during eviction
  */
-int upload_file(const char *path) {
+int upload_file( const char *path ) {
         /* set lock to file to prevent other threads' and processes'
            access to file's data */
-        if (lock_file(path) == -1) {
+        if ( try_lock_file( path ) == -1 ) {
+                LOG( DEBUG,
+                     "[upload_file] aborting file %s upload operation because "
+                     "it is locked by another thread or process",
+                     path );
                 return -1;
         }
 
+        /* check file's location */
+        if ( ! is_file_local(path) ) {
+                LOG( DEBUG,
+                     "[upload_file] aborting file %s upload operation because "
+                     "it is already in the remote storage",
+                     path );
+
+                /* NOTE: failues in the cleanup functions are impossible
+                         as long as the program's logic is correct */
+                unlock_file( path );
+                return 0;
+        }
+
         /* upload file's data to remote storage */
-        if (get_ops()->upload(path) == -1) {
-                goto err_unlock; /* unset lock and exit */
+        if ( get_ops()->upload( path ) == -1 ) {
+                LOG( ERROR,
+                     "[upload_file] aborting file %s upload operation because "
+                     "file's data upload failed",
+                     path );
+
+                /* NOTE: failues in the cleanup functions are impossible
+                         as long as the program's logic is correct */
+                unlock_file( path );
+                return -1;
+        }
+
+        /* set object id to a corresponding attribute */
+        if ( set_xattr( path,
+                        e_object_id,
+                        get_ops()->get_xattr_value( path ),
+                        get_ops()->get_xattr_size(),
+                        XATTR_CREATE ) == -1 ) {
+                LOG( ERROR,
+                     "[upload_file] aborting file %s upload operation because "
+                     "failed to set object identifier as a file's meta-data",
+                     path );
+
+                /* NOTE: failues in the cleanup functions are impossible
+                         as long as the program's logic is correct */
+                unlock_file( path );
+                return -1;
         }
 
         /* set file's location information */
-        const char *key = xattr_str[e_location];
-        xattr_location_t location_val = REMOTE_STORAGE;
-        if (setxattr(path, key, &location_val, xattr_max_size[e_location],
-                     XATTR_CREATE) == -1) {
-                /* strerror_r() with very low probability can fail;
-                   ignore such failures */
-                strerror_r(errno, err_buf, ERR_MSG_BUF_LEN);
+        if ( set_xattr( path, e_stub, NULL, 0, XATTR_CREATE ) == -1 ) {
+                LOG( ERROR,
+                     "[upload_file] aborting file %s upload operation because "
+                     "failed to set location information as a file's meta-data",
+                     path );
 
-                LOG(ERROR,
-                    "failed to set extended attribute %s with value %s to "
-                    "file %s [reason: %s]",
-                    key,
-                    path,
-                    path,
-                    err_buf);
-
-                goto err_unlock; /* unset lock and exit */
+                /* NOTE: failues in the cleanup functions are impossible
+                         as long as the program's logic is correct */
+                remove_xattr( path, e_object_id );
+                unlock_file( path );
+                return -1;
         }
 
+        /* TODO: check that file still meets eviction requirements */
+
         /* truncate file */
-        if (truncate(path, 0) == -1) {
+        if ( truncate( path, 0 ) == -1 ) {
                 /* TODO: handle EINTR case */
 
                 /* strerror_r() with very low probability can fail;
                    ignore such failures */
-                strerror_r(errno, err_buf, ERR_MSG_BUF_LEN);
+                strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
 
-                LOG(ERROR,
-                    "failed to truncate file %s [reason: %s]",
-                    path,
-                    err_buf);
+                LOG( ERROR,
+                     "[upload_file] aborting file %s upload operation because "
+                     "failed to truncate this file [reason: %s]",
+                     path,
+                     err_buf );
 
-                /* remove location attribute, unset lock and exit */
-                goto err_location_unlock;
-        }
-
-        /* all actions indended to file upload succeeded; just need to unlock */
-        if (unlock_file(path) == -1) {
-                /* TODO: do some repair actions;
-                         files should not be left locked */
+                /* NOTE: failues in the cleanup functions are impossible
+                         as long as the program's logic is correct */
+                remove_xattr( path, e_object_id );
+                remove_xattr( path, e_stub );
+                unlock_file( path );
                 return -1;
         }
 
+        /* all actions indended to file upload succeeded; just need to unlock */
+        /* NOTE: failues in the cleanup functions are impossible
+                 as long as the program's logic is correct */
+        unlock_file( path );
         return 0;
-
-    err_location_unlock:
-        /* remove location attribute */
-        if (removexattr(path, xattr_str[e_location]) == -1) {
-                /* non-existance of location attribute indicates an error
-                   in logic of this program */
-
-                /* strerror_r() with very low probability can fail;
-                   ignore such failures */
-                strerror_r(errno, err_buf, ERR_MSG_BUF_LEN);
-
-                LOG(ERROR,
-                    "failed to remove extended attribute %s of file %s "
-                    "[reason: %s]",
-                    xattr_str[e_location],
-                    path,
-                    err_buf);
-        }
-
-    err_unlock:
-        /* unset lock from file */
-        if (unlock_file(path) == -1) {
-                /* TODO: do some repair actions;
-                         files should not be left locked */
-        }
-
-        return -1;
 }
 
 /**
@@ -290,51 +343,75 @@ int upload_file(const char *path) {
  *         -1: failure happen due dowload of file or
  *             file is currently being downloaded by another thread
  */
-int download_file(const char *path) {
+int download_file( const char *path ) {
         /* set lock to file to prevent other threads' and processes'
-           access to file's data */
-        if (lock_file(path) == -1) {
+           access to file */
+        if ( try_lock_file( path ) == -1 ) {
+                LOG( DEBUG,
+                     "[download_file] aborting file %s download operation "
+                     "because it is locked by another thread or process",
+                     path );
                 return -1;
         }
 
-        /* upload file's data to remote storage */
-        if (get_ops()->download(path) == -1) {
-                goto err_unlock; /* unset lock and exit */
+        /* check file's location */
+        if ( is_file_local( path ) ) {
+                LOG( DEBUG,
+                     "[download_file] aborting file %s download operation "
+                     "because it is already in the local storage",
+                     path );
+                /* NOTE: failues in the cleanup functions are impossible
+                         as long as the program's logic is correct */
+                unlock_file( path );
+                return 0;
         }
 
-        /* remove location attribute */
-        if (removexattr(path, xattr_str[e_location]) == -1) {
-                /* non-existance of location attribute indicates an error
-                   in logic of this program */
+        /* download file's data to local storage */
+        if ( get_ops()->download( path ) == -1 ) {
+                LOG( ERROR,
+                     "[download_file] aborting file %s download operation "
+                     "because file's data download failed",
+                     path );
 
-                /* strerror_r() with very low probability can fail;
-                   ignore such failures */
-                strerror_r(errno, err_buf, ERR_MSG_BUF_LEN);
-
-                LOG(ERROR,
-                    "failed to remove extended attribute %s of file %s "
-                    "[reason: %s]",
-                    xattr_str[e_location],
-                    path,
-                    err_buf);
-        }
-
-        /* all actions indended to file download succeeded;
-           just need to unlock */
-        if (unlock_file(path) == -1) {
-                /* TODO: do some repair actions;
-                         files should not be left locked */
+                /* NOTE: failues in the cleanup functions are impossible
+                         as long as the program's logic is correct */
+                unlock_file( path );
                 return -1;
         }
+
+        /* remove file's location information */
+        if ( remove_xattr( path, e_stub ) == -1 ) {
+                /* NOTE: impossible case in case program's logic is correct */
+
+                LOG( ERROR,
+                     "[download_file] aborting file %s download operation "
+                     "because failed to remove location file's meta-data",
+                     path );
+
+                /* NOTE: failues in the cleanup functions are impossible
+                         as long as the program's logic is correct */
+                unlock_file( path );
+                return -1;
+        }
+
+        if ( remove_xattr( path, e_object_id ) == -1 ) {
+                /* NOTE: impossible case in case program's logic is correct */
+
+                LOG( ERROR,
+                     "[download_file] aborting file %s download operation "
+                     "because failed to remove object identifier "
+                     "file's meta-data",
+                     path );
+
+                /* NOTE: failues in the cleanup functions are impossible
+                         as long as the program's logic is correct */
+                unlock_file( path );
+                return -1;
+        }
+
+        /* NOTE: failues in the cleanup functions are impossible
+                 as long as the program's logic is correct */
+        unlock_file( path );
 
         return 0;
-
-    err_unlock:
-        /* unset lock from file */
-        if (unlock_file(path) == -1) {
-                /* TODO: do some repair actions;
-                         files should not be left locked */
-        }
-
-        return -1;
 }
