@@ -361,7 +361,7 @@ int s3_upload(const char *path) {
 
         do {
                 S3_put_object(&g_bucket_context,
-                              path,
+                              s3_get_xattr_value(path),
                               put_object_data.content_length,
                               NULL,
                               NULL,
@@ -387,25 +387,6 @@ int s3_upload(const char *path) {
                 }
 
                 LOG(ERROR, "failed to close file %s: %s", path, err_buf);
-                ret = -1;
-        }
-
-        const char *key = "object_id";
-        char *value = get_ops()->get_xattr_value(path);
-
-        if (setxattr(path, key, value, S3_XATTR_SIZE, XATTR_CREATE) == -1) {
-                /* strerror_r() with very low probability can fail;
-                   ignore such failures */
-                strerror_r(errno, err_buf, ERR_MSG_BUF_LEN);
-
-                LOG(ERROR,
-                    "failed to set extended attribute %s with value %s "
-                    "to file %s [reason: %s]",
-                    key,
-                    path,
-                    path,
-                    err_buf);
-
                 ret = -1;
         }
 
@@ -594,7 +575,8 @@ char *s3_get_xattr_value(const char *path) {
 
         size_t pos = 0;
         for (; pos < key_len; pos++) {
-                s3_xattr_buf[pos] = path[key_len - pos - 1];
+                char c = path[key_len - pos - 1];
+                s3_xattr_buf[pos] = ( c == '/' ) ? '-' : c;
         }
         s3_xattr_buf[pos] = '\0';
 
