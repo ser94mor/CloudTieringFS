@@ -54,7 +54,8 @@ TST_SRC  := $(call src_func,TST)
 obj_func  = $(subst ${SRC_DIR},${BIN_DIR},$($(1)_SRC:.c=.o))
 LIB_OBJ  := $(call obj_func,LIB)
 APP_OBJ  := $(call obj_func,APP)
-TST_OBJ  := $(call obj_func,TST)
+TST_OBJ  := $(call obj_func,TST) \
+            $(filter-out ${BIN_DIR}/${APP_SUBDIR}/daemon.o,${APP_OBJ})
 
 
 # dependencies
@@ -83,45 +84,50 @@ LIB_CC_FLAGS_LNK  := ${CC_FLAGS_LNK_COMMON} $(addprefix -l,${LIB_DEP}) \
                      -shared -Wl,-soname,${LIB_SONAME}
 APP_CC_FLAGS_LNK  := ${CC_FLAGS_LNK_COMMON} $(addprefix -l,${APP_DEP})
 TST_CC_FLAGS_LNK  := ${CC_FLAGS_LNK_COMMON} $(addprefix -l,${TST_DEP})
-
+CFLAGS =
 
 ### targets
 all: app lib tst validate
 
 
-app: mkdir-${BIN_DIR}/${APP_SUBDIR} ${APP_OBJ}
-	${CC} ${APP_CC_FLAGS_LNK} -o ${BIN_DIR}/${APP_NAME} ${APP_OBJ}
+app: APP
 
 
-lib: mkdir-${BIN_DIR}/${LIB_SUBDIR} ${LIB_OBJ}
-	${CC} ${LIB_CC_FLAGS_LNK} -o ${BIN_DIR}/${LIB_NAME} ${LIB_OBJ}
+tst: TST
+
+
+lib: LIB
 	ln --symbolic --force ${LIB_NAME} ${BIN_DIR}/${LIB_SONAME}
 
 
-tst: mkdir-${BIN_DIR}/${TST_SUBDIR} ${APP_OBJ} ${TST_OBJ}
-	${CC} ${TST_CC_FLAGS_LNK} -o ${BIN_DIR}/${TST_NAME} ${TST_OBJ} $(filter-out ${BIN_DIR}/${APP_SUBDIR}/daemon.o,${APP_OBJ})
+APP LIB TST: %: mkdir-% compile-% link-%
 
 
-validate: lib app tst mkdir-${BIN_DIR}/validate
+mkdir-%:
+	mkdir --parents ${BIN_DIR}/${$*_SUBDIR}
+
+
+compile-%:
+	@$(MAKE) ${$*_OBJ} CATEGORY=$*
+
+
+link-%:
+	@$(MAKE) ${BIN_DIR}/${$*_NAME} CATEGORY=$*
+
+
+${BIN_DIR}/%.o: ${SRC_DIR}/%.c
+	${CC} ${${CATEGORY}_CC_FLAGS_CMPL} -o $@ $<
+
+
+${BIN_DIR}/%: ${${CATEGORY}_OBJ}
+	${CC} ${${CATEGORY}_CC_FLAGS_LNK} -o ${BIN_DIR}/${${CATEGORY}_NAME} $^
+
+
+validate: lib app tst
+	mkdir --parents ${BIN_DIR}/validate
 	@pushd ${BIN_DIR}/validate 1>/dev/null && \
 	LD_LIBRARY_PATH=../ ../${TST_NAME} && \
 	popd 1>/dev/null
-
-
-${BIN_DIR}/${LIB_SUBDIR}/%.o: ${SRC_DIR}/${LIB_SUBDIR}/%.c
-	${CC} ${LIB_CC_FLAGS_CMPL} -o $@ $<
-
-
-${BIN_DIR}/${APP_SUBDIR}/%.o: ${SRC_DIR}/${APP_SUBDIR}/%.c
-	${CC} ${APP_CC_FLAGS_CMPL} -o $@ $<
-
-
-${BIN_DIR}/${TST_SUBDIR}/%.o: ${SRC_DIR}/${TST_SUBDIR}/%.c
-	${CC} ${TST_CC_FLAGS_CMPL} -o $@ $<
-
-
-mkdir-${BIN_DIR}/%:
-	mkdir --parents $(subst mkdir-,,$@)
 
 
 clean:
