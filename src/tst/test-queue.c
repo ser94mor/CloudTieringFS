@@ -710,19 +710,18 @@ int test_queue(char *err_msg) {
     err:
         /* do-while is needed because a label can only be part of a statement */
         do {
-                FILE *stream;
                 if (queue != NULL)  {
-                        stream = fopen("./test-queue.dump", "w");
+                        FILE *stream = fopen("./test-queue.dump", "w");
                         if (!stream) {
                                 return -1;
                         }
 
                         queue_print(stream, queue);
+                        /* does not really want to know if
+                           fclose fail here or not */
+                        fclose(stream);
                 }
                 queue_destroy(queue);
-
-                /* does not really want to know if fclose fail here or not */
-                fclose(stream);
         } while(0);
 
         return -1;
