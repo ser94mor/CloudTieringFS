@@ -29,46 +29,46 @@ VERSION   := ${MAJOR_VER}.${MINOR_VER}.${PATCH_VER}
 
 ### names
 NAME       := cloudtiering
-APP_NAME   := ${NAME}-daemon
-LIB_SONAME := lib${NAME}.so
-LIB_NAME   := ${LIB_SONAME}.${VERSION}
-TST_NAME   := ${NAME}-test
+app_NAME   := ${NAME}-daemon
+lib_SONAME := lib${NAME}.so
+lib_NAME   := ${lib_SONAME}.${VERSION}
+tst_NAME   := ${NAME}-test
 
 
 ### directories
 INC_DIR    := inc
 BIN_DIR    := bin
 SRC_DIR    := src
-APP_SUBDIR := app
-LIB_SUBDIR := lib
-TST_SUBDIR := tst
+app_SUBDIR := app
+lib_SUBDIR := lib
+tst_SUBDIR := tst
 
 
 ### lists of source files
 src_func  = $(wildcard ${SRC_DIR}/$($(1)_SUBDIR)/*.c)
-LIB_SRC  := $(call src_func,LIB)
-APP_SRC  := $(call src_func,APP)
-TST_SRC  := $(call src_func,TST)
+lib_SRC  := $(call src_func,lib)
+app_SRC  := $(call src_func,app)
+tst_SRC  := $(call src_func,tst)
 
 ### lists of produced objects
 obj_func  = $(subst ${SRC_DIR},${BIN_DIR},$($(1)_SRC:.c=.o))
-LIB_OBJ  := $(call obj_func,LIB)
-APP_OBJ  := $(call obj_func,APP)
-TST_OBJ  := $(call obj_func,TST) \
-            $(filter-out ${BIN_DIR}/${APP_SUBDIR}/daemon.o,${APP_OBJ})
+lib_OBJ  := $(call obj_func,lib)
+app_OBJ  := $(call obj_func,app)
+tst_OBJ  := $(call obj_func,tst) \
+            $(filter-out ${BIN_DIR}/${app_SUBDIR}/daemon.o,${app_OBJ})
 
 
 # dependencies
-LIB_DEP := dl rt
-APP_DEP := dotconf s3 rt
-TST_DEP := ${APP_DEP}
+lib_DEP := dl rt
+app_DEP := dotconf s3 rt
+tst_DEP := ${app_DEP}
 
 
 # include dirs
 inc_func = ${INC_DIR}/${$(1)_SUBDIR}
-LIB_INC := $(call inc_func,LIB)
-APP_INC := $(call inc_func,APP)
-TST_INC := $(call inc_func,TST)
+lib_INC := $(call inc_func,lib)
+app_INC := $(call inc_func,app)
+tst_INC := $(call inc_func,tst)
 
 
 ### compiler
@@ -76,68 +76,50 @@ CC                   := gcc-5
 CC_FLAGS_CMPL_COMMON := -g -c -Wall -pthread -std=c11 -O3 -I${INC_DIR}
 CC_FLAGS_LNK_COMMON  := -g -pthread
 
-LIB_CC_FLAGS_CMPL := ${CC_FLAGS_CMPL_COMMON} -fPIC
-APP_CC_FLAGS_CMPL := ${CC_FLAGS_CMPL_COMMON}
-TST_CC_FLAGS_CMPL := ${CC_FLAGS_CMPL_COMMON}
+lib_CC_FLAGS_CMPL := ${CC_FLAGS_CMPL_COMMON} -fPIC
+app_CC_FLAGS_CMPL := ${CC_FLAGS_CMPL_COMMON}
+tst_CC_FLAGS_CMPL := ${CC_FLAGS_CMPL_COMMON}
 
-LIB_CC_FLAGS_LNK  := ${CC_FLAGS_LNK_COMMON} $(addprefix -l,${LIB_DEP}) \
-                     -shared -Wl,-soname,${LIB_SONAME}
-APP_CC_FLAGS_LNK  := ${CC_FLAGS_LNK_COMMON} $(addprefix -l,${APP_DEP})
-TST_CC_FLAGS_LNK  := ${CC_FLAGS_LNK_COMMON} $(addprefix -l,${TST_DEP})
-CFLAGS =
+lib_CC_FLAGS_LNK  := ${CC_FLAGS_LNK_COMMON} $(addprefix -l,${lib_DEP}) \
+                     -shared -Wl,-soname,${lib_SONAME}
+app_CC_FLAGS_LNK  := ${CC_FLAGS_LNK_COMMON} $(addprefix -l,${app_DEP})
+tst_CC_FLAGS_LNK  := ${CC_FLAGS_LNK_COMMON} $(addprefix -l,${tst_DEP})
+
 
 ### targets
+.SECONDEXPANSION:
 all: app lib tst validate
 
 
-app: APP
+app lib tst: %: $${$$@_OBJ} ${BIN_DIR}/%/%.out
+	@ln --force ${BIN_DIR}/$@/$@.out ${BIN_DIR}/${$@_NAME}
 
 
-tst: TST
+${BIN_DIR}/%.o: ${SRC_DIR}/%.c | ${BIN_DIR}/$$(*D)
+	${CC} ${$(*D)_CC_FLAGS_CMPL} -o $@ $<
 
 
-lib: LIB
-	ln --symbolic --force ${LIB_NAME} ${BIN_DIR}/${LIB_SONAME}
+${BIN_DIR}/%.out: $${$$(*D)_OBJ} | ${BIN_DIR}/$$(*D)
+	${CC} ${$(*D)_CC_FLAGS_LNK} -o $@ $^
 
 
-APP LIB TST: %: mkdir-% compile-% link-%
+$(addprefix ${BIN_DIR}/,app lib tst validate):
+	mkdir --parents $@
 
 
-mkdir-%:
-	mkdir --parents ${BIN_DIR}/${$*_SUBDIR}
-
-
-compile-%:
-	@$(MAKE) ${$*_OBJ} CATEGORY=$*
-
-
-link-%:
-	@$(MAKE) ${BIN_DIR}/${$*_NAME} CATEGORY=$*
-
-
-${BIN_DIR}/%.o: ${SRC_DIR}/%.c
-	${CC} ${${CATEGORY}_CC_FLAGS_CMPL} -o $@ $<
-
-
-${BIN_DIR}/%: ${${CATEGORY}_OBJ}
-	${CC} ${${CATEGORY}_CC_FLAGS_LNK} -o ${BIN_DIR}/${${CATEGORY}_NAME} $^
-
-
-validate: lib app tst
-	mkdir --parents ${BIN_DIR}/validate
+.PHONY:
+validate: ${BIN_DIR}/$$@ app lib tst
 	@pushd ${BIN_DIR}/validate 1>/dev/null && \
-	LD_LIBRARY_PATH=../ ../${TST_NAME} && \
+	LD_LIBRARY_PATH=../ ../${tst_NAME} && \
 	popd 1>/dev/null
 
 
+.PHONY:
 clean:
 	rm --recursive --force ${BIN_DIR}
 
 
-clean-%: clean-${BIN_DIR}/%
-	rm --force ${BIN_DIR}/$($(shell tr '[:lower:]' '[:upper:]' <<< $(subst clean-${BIN_DIR}/,,$<))_NAME)
-
-
-clean-${BIN_DIR}/%:
-	rm --recursive --force $(subst clean-,,$@)
+.PHONY:
+clean-%:
+	rm --force --recursive ${BIN_DIR}/$($*_NAME) ${BIN_DIR}/$*
 
