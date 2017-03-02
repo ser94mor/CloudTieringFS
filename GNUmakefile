@@ -24,15 +24,17 @@
 MAJOR_VER := 0
 MINOR_VER := 2
 PATCH_VER := 0
-VERSION   := ${MAJOR_VER}.${MINOR_VER}.${PATCH_VER}
 
 
 ### names
-NAME       := cloudtiering
-app_NAME   := ${NAME}-daemon
-lib_SONAME := lib${NAME}.so
-lib_NAME   := ${lib_SONAME}.${VERSION}
-tst_NAME   := ${NAME}-test
+NAME         := cloudtiering
+app_NAME     := ${NAME}-daemon
+
+lib_LNK_NAME := lib${NAME}.so
+lib_SONAME   := ${lib_LNK_NAME}.${MAJOR_VER}
+lib_NAME     := ${lib_SONAME}.${MINOR_VER}.${PATCH_VER}
+
+tst_NAME     := ${NAME}-test
 
 
 ### directories
@@ -109,6 +111,8 @@ $(addprefix ${BIN_DIR}/,app lib tst validate):
 
 .PHONY:
 validate: ${BIN_DIR}/$$@ app lib tst
+	@ln --symbolic --force ${lib_NAME} ${BIN_DIR}/${lib_SONAME}
+	@ln --symbolic --force ${lib_SONAME} ${BIN_DIR}/${lib_LNK_NAME}
 	@pushd ${BIN_DIR}/validate 1>/dev/null && \
 	LD_LIBRARY_PATH=../ ../${tst_NAME} && \
 	popd 1>/dev/null
