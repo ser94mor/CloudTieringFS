@@ -83,7 +83,7 @@ app_CC_FLAGS_CMPL := ${CC_FLAGS_CMPL_COMMON}
 tst_CC_FLAGS_CMPL := ${CC_FLAGS_CMPL_COMMON}
 
 lib_CC_FLAGS_LNK  := ${CC_FLAGS_LNK_COMMON} $(addprefix -l,${lib_DEP}) \
-                     -shared -Wl,-soname,${lib_SONAME}
+                     -shared -Wl,-Bsymbolic,-soname,${lib_SONAME}
 app_CC_FLAGS_LNK  := ${CC_FLAGS_LNK_COMMON} $(addprefix -l,${app_DEP})
 tst_CC_FLAGS_LNK  := ${CC_FLAGS_LNK_COMMON} $(addprefix -l,${tst_DEP})
 
