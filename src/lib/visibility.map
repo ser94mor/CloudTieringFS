@@ -1,5 +1,9 @@
-{
+CLOUDTIERING_0.3 {
         global:
+                #
+                # symbols visible to the outer world
+                #
+
                 open;
                 open64;
                 openat;
@@ -19,6 +23,10 @@
                 fopen;
                 freopen;
         local:
+                #
+                # all other symbols are invisible
+                #
+
                 *;
 };
 

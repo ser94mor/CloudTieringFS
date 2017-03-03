@@ -22,7 +22,7 @@
 
 ### versions
 MAJOR_VER := 0
-MINOR_VER := 2
+MINOR_VER := 3
 PATCH_VER := 0
 
 
