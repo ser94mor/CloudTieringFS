@@ -52,6 +52,8 @@ lib_SRC  := $(call src_func,lib)
 app_SRC  := $(call src_func,app)
 tst_SRC  := $(call src_func,tst)
 
+lib_MAP  := $(wildcard ${SRC_DIR}/${lib_SUBDIR}/*.map)
+
 ### lists of produced objects
 obj_func  = $(subst ${SRC_DIR},${BIN_DIR},$($(1)_SRC:.c=.o))
 lib_OBJ  := $(call obj_func,lib)
@@ -82,8 +84,9 @@ lib_CC_FLAGS_CMPL := ${CC_FLAGS_CMPL_COMMON} -fPIC
 app_CC_FLAGS_CMPL := ${CC_FLAGS_CMPL_COMMON}
 tst_CC_FLAGS_CMPL := ${CC_FLAGS_CMPL_COMMON}
 
-lib_CC_FLAGS_LNK  := ${CC_FLAGS_LNK_COMMON} $(addprefix -l,${lib_DEP}) \
-                     -shared -Wl,-Bsymbolic,-soname,${lib_SONAME}
+lib_CC_FLAGS_LNK  := \
+        ${CC_FLAGS_LNK_COMMON} $(addprefix -l,${lib_DEP}) \
+        -shared -Wl,-Bsymbolic,-soname,${lib_SONAME},--version-script,${lib_MAP}
 app_CC_FLAGS_LNK  := ${CC_FLAGS_LNK_COMMON} $(addprefix -l,${app_DEP})
 tst_CC_FLAGS_LNK  := ${CC_FLAGS_LNK_COMMON} $(addprefix -l,${tst_DEP})
 

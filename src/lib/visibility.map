@@ -1,0 +1,24 @@
+{
+        global:
+                open;
+                open64;
+                openat;
+                openat64;
+                truncate;
+                truncate64;
+                stat;
+                stat64;
+                fstatat;
+                fstatat64;
+                futimesat;
+                futimesat;
+                utime;
+                fadvise;
+                fadvise64;
+
+                fopen;
+                freopen;
+        local:
+                *;
+};
+
