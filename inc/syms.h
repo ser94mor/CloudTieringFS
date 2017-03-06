@@ -15,10 +15,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef POSIX_OPS_H
-#define POSIX_OPS_H
+#ifndef CLOUDTIERING_SYMS_H
+#define CLOUDTIERING_SYMS_H
 
-#include <stdlib.h>
+#include <stdio.h>
 #include <utime.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -40,6 +40,9 @@ typedef struct {
     int (*utime)(const char *path, const struct utimbuf *buf);                  // may need to use it in daemon to leave modification time untouched
     int (*fadvise)(int fd, off_t offset, off_t len, int advice);                // can be used to notify about an intention to open file (we can do early download)
     int (*fadvise64)(int fd, off64_t offset, off64_t len, int advice);          // can be used to notify about an intention to open file (we can do early download)
-} posix_ops_t;
 
-#endif /* POSIX_OPS_H */
+    FILE *(*fopen)(const char *path, const char *mode);                         // need to download file
+    FILE *(*freopen)(const char *path, const char *mode, FILE *stream);         // need to download file
+} symbols_t;
+
+#endif /* CLOUDTIERING_SYMS_H */
