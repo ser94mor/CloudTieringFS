@@ -24,7 +24,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#include "cloudtiering.h"
+#include "conf.h"
+#include "log.h"
 
 static const char *test_conf_str = \
         "<General>\n"                                       \

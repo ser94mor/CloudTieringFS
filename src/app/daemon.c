@@ -22,7 +22,11 @@
 #include <stdio.h>
 #include <pthread.h>
 
-#include "cloudtiering.h"
+#include "log.h"
+#include "conf.h"
+#include "queue.h"
+#include "policy.h"
+#include "ops.h"
 
 typedef struct {
         void *first;

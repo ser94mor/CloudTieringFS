@@ -27,7 +27,8 @@
 #include <string.h>
 #include <libs3.h>
 
-#include "cloudtiering.h"
+#include "log.h"
+#include "conf.h"
 
 typedef FILE *(*fopen_t)(const char *filename, const char *mode);
 

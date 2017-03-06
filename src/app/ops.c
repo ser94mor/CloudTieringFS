@@ -31,7 +31,8 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-#include "cloudtiering.h"
+#include "ops.h"
+#include "log.h"
 
 /* the constant representing extended attributes namespace */
 #define XATTR_NAMESPACE             "trusted"

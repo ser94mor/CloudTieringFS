@@ -9,7 +9,10 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 
-#include "cloudtiering.h"
+#include "log.h"
+#include "ops.h"
+#include "conf.h"
+#include "queue.h"
 
 /*******************
  * Scan filesystem *

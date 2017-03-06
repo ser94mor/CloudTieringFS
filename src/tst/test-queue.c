@@ -29,7 +29,7 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 
-#include "cloudtiering.h"
+#include "queue.h"
 
 #define QUEUE_MAX_SIZE    3
 #define DATA_MAX_SIZE     20

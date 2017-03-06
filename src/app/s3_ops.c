@@ -25,7 +25,9 @@
 #include <attr/xattr.h>
 #include <libs3.h>
 
-#include "cloudtiering.h"
+#include "ops.h"
+#include "conf.h"
+#include "log.h"
 
 /* +1 is for '\0' character */
 #define S3_XATTR_KEY     "s3_object_id"

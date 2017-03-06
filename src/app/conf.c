@@ -26,7 +26,9 @@
 #include <linux/limits.h>
 #include <dotconf.h>
 
-#include "cloudtiering.h"
+#include "conf.h"
+#include "ops.h"
+#include "log.h"
 #include "log_internal.h"
 
 static conf_t *conf = NULL;

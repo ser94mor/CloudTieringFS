@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2016, 2017  Sergey Morozov <sergey94morozov@gmail.com>
+ * Copyright (C) 2017  Sergey Morozov <sergey94morozov@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -15,11 +15,17 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef TEST_H
-#define TEST_H
+#ifndef CLOUDTIERING_POLICY_H
+#define CLOUDTIERING_POLICY_H
 
-int test_conf(char *err_msg);
-int test_log(char *err_msg);
-int test_queue(char *err_msg);
+/*******************************************************************************
+* POLICY                                                                       *
+* ------                                                                       *
+* TODO: write description                                                      *
+*******************************************************************************/
 
-#endif // TEST_H
+#include "queue.h"
+
+int scan_fs(queue_t *download_queue, queue_t *upload_queue);
+
+#endif    /* CLOUDTIERING_POLICY_H */

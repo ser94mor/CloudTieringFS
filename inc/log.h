@@ -106,4 +106,6 @@ typedef struct {
 #define LOG(level,format,args...) (get_log()->log(level, format, ## args))
 #define CLOSE_LOG()               (get_log()->close_log())
 
+log_t *get_log();
+
 #endif    /* CLOUDTIERING_LOG_H */

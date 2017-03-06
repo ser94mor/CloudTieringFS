@@ -18,7 +18,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "cloudtiering.h"
 #include "test.h"
 
 static struct test_case {

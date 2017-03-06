@@ -20,7 +20,8 @@
 #include <setjmp.h>
 #include <stdio.h>
 
-#include "cloudtiering.h"
+#include "log.h"
+#include "conf.h"
 
 static jmp_buf restore_point; /* needed to recover from segfault */
 

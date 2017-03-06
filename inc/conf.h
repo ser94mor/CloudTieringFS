@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2016, 2017  Sergey Morozov <sergey94morozov@gmail.com>
+ * Copyright (C) 2017  Sergey Morozov <sergey94morozov@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -15,13 +15,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef CLOUDTIERING_H
-#define CLOUDTIERING_H
-
-#include "defs.h"
-#include "queue.h"
-#include "log.h"
-
+#ifndef CLOUDTIERING_CONF_H
+#define CLOUDTIERING_CONF_H
 
 /*******************************************************************************
 * CONFIGURATION                                                                *
@@ -29,6 +24,11 @@
 *                                                                              *
 * TODO: write description                                                      *
 *******************************************************************************/
+
+#include <stddef.h>
+#include <time.h>
+
+#include "defs.h"
 
 /* a list of sections' names in configuration file */
 #define SECTIONS(action, sep)     \
@@ -50,61 +50,8 @@ enum section_enum {
         SECTIONS(ENUMERIZE, COMMA),
 };
 
-
-/*******************************************************************************
-* OPERATIONS                                                                   *
-* ----------                                                                   *
-*                                                                              *
-* TODO: write description                                                      *
-*******************************************************************************/
-
-/* a list of supported protocols */
-#define PROTOCOLS(action, sep) \
-        action(s3)
-
-/* enum of supported protocols */
-enum protocol_enum {
-        PROTOCOLS(ENUMERIZE, COMMA),
-};
-
-/* a macro-function to declare ops_t data-structure for a given protocol */
-#define DECLARE_OPS(elem)                                       \
-        static ops_t elem##_ops = {                             \
-                .protocol        = ENUMERIZE(elem),             \
-                .connect         = elem##_connect,              \
-                .download        = elem##_download,             \
-                .upload          = elem##_upload,               \
-                .disconnect      = elem##_disconnect,           \
-                .get_xattr_value = elem##_get_xattr_value,      \
-                .get_xattr_size  = elem##_get_xattr_size,       \
-        }
-
-typedef struct {
-        enum protocol_enum protocol;
-        int    (*connect)(void);
-        int    (*download)(const char *path);
-        int    (*upload)(const char *path);
-        void   (*disconnect)(void);
-        char  *(*get_xattr_value)(const char *path);
-        size_t (*get_xattr_size)(void);
-} ops_t;
-
-int    s3_connect(void);
-int    s3_download(const char *path);
-int    s3_upload(const char *path);
-void   s3_disconnect(void);
-char  *s3_get_xattr_value(const char *path);
-size_t s3_get_xattr_size(void);
-
-int download_file(const char *path);
-int upload_file(const char *path);
-int is_file_local(const char *path);
-int is_valid_path(const char *path);
-
-
-#include <stddef.h>
-#include <time.h>
-
+/* TODO: this massive struct is legacy and
+         should be devided to smaller units */
 typedef struct {
         /* 4096 is minimum acceptable value (including null) according to POSIX (equals PATH_MAX from linux/limits.h) */
         char   fs_mount_point[4096];          /* filesystem's root directory */
@@ -146,15 +93,5 @@ typedef struct {
 
 int read_conf(const char *conf_path);
 conf_t *get_conf();
-log_t  *get_log();
-ops_t  *get_ops();
 
-
-/*
- * SCANFS
- */
-
-int scan_fs(queue_t *download_queue, queue_t *upload_queue);
-
-
-#endif /* CLOUDTIERING_H */
+#endif    /* CLOUDTIERING_CONF_H */
