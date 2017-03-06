@@ -27,7 +27,7 @@
 #include <dotconf.h>
 
 #include "cloudtiering.h"
-#include "log.h"
+#include "log_internal.h"
 
 static conf_t *conf = NULL;
 static log_t  *log  = NULL;

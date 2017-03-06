@@ -15,8 +15,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef LOG_H
-#define LOG_H
+#ifndef CLOUDTIERING_LOG_INTERNAL_H
+#define CLOUDTIERING_LOG_INTERNAL_H
 
 /**
  * SYSLOG
@@ -50,4 +50,4 @@ void simple_open_log(const char *name);
 void simple_log(int level, const char *msg_fmt, ...);
 void simple_close_log(void);
 
-#endif /* LOG_H */
+#endif /* CLOUDTIERING_LOG_INTERNAL_H */

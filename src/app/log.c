@@ -21,7 +21,7 @@
 #include <string.h>
 #include <pthread.h>
 
-#include "log.h"
+#include "log_internal.h"
 
 
 /*

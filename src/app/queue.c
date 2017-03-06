@@ -27,7 +27,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#include "cloudtiering.h"
+#include "queue.h"
 
 
 /**
@@ -41,9 +41,10 @@
  *
  * @return a number of bytes required to store one element in a queue
  */
-static inline size_t queue_bytes_per_elem(const queue_t *queue) {
-        return (sizeof(size_t) + queue->data_max_size);
+static inline size_t queue_bytes_per_elem( const queue_t *queue ) {
+        return ( sizeof( size_t ) + queue->data_max_size );
 }
+
 
 /**
  * @brief queue_buf_end Returns a pointer to queue's buffer end.
@@ -55,9 +56,10 @@ static inline size_t queue_bytes_per_elem(const queue_t *queue) {
  *
  * @return a pointer to an end of queue's buffer
  */
-static inline const char *queue_buf_end(const queue_t *queue) {
-        return (((char *)queue) + queue->buf_offset + queue->buf_size);
+static inline const char *queue_buf_end( const queue_t *queue ) {
+        return ( (char *)queue + queue->buf_offset + queue->buf_size );
 }
+
 
 /**
  * @brief queue_elem_size Returns a size in bytes of a given element of a queue.
@@ -69,9 +71,10 @@ static inline const char *queue_buf_end(const queue_t *queue) {
  *
  * @return size of a data of a given element
  */
-static inline size_t queue_elem_size(const char *elem) {
-        return (*((size_t *)elem));
+static inline size_t queue_elem_size( const char *elem ) {
+        return ( *( (size_t *)elem ) );
 }
+
 
 /**
  * @brief queue_elem_data A pointer to an element's data.
@@ -83,22 +86,74 @@ static inline size_t queue_elem_size(const char *elem) {
  *
  * @return a pointer to an element's data
  */
-static inline char *queue_elem_data(const char *elem) {
-        return ((char *)elem + sizeof(size_t));
+static inline char *queue_elem_data( const char *elem ) {
+        return ( (char *)elem + sizeof( size_t ) );
 }
 
-static inline char *queue_buf_beg(const queue_t *queue) {
-        return (((char *)queue) + queue->buf_offset);
+
+/**
+ * @brief queue_buf_beg A pointer to a queue's buffer.
+ *
+ * @note This function is thread-safe.
+ * @warning This function does not check a correctness of input parameters.
+ *
+ *  @param[in] queue A queue whose buffer's pointer will be returned.
+ *
+ * @return a pointer to queue's buffer
+ */
+static inline char *queue_buf_beg( const queue_t *queue ) {
+        return ( (char *)queue + queue->buf_offset );
 }
 
-static inline char *queue_head(const queue_t *queue) {
-        return (((char *)queue) + queue->head_offset);
+
+/**
+ * @brief queue_head A pointer to a queue's head.
+ *
+ * @warning This function is not thread-safe.
+ * @warning This function does not check a correctness of input parameters.
+ *
+ *  @param[in] queue A queue whose head's pointer will be returned.
+ *
+ * @return a pointer to queue's head
+ */
+static inline char *queue_head( const queue_t *queue ) {
+        return ( (char *)queue + queue->head_offset );
 }
 
-static inline char *queue_tail(const queue_t *queue) {
-        return (((char *)queue) + queue->tail_offset);
+
+/**
+ * @brief queue_tail A pointer to a queue's tail.
+ *
+ * @warning This function is not thread-safe.
+ * @warning This function does not check a correctness of input parameters.
+ *
+ *  @param[in] queue A queue whose tail's pointer will be returned.
+ *
+ * @return a pointer to queue's tail
+ */
+static inline char *queue_tail( const queue_t *queue ) {
+        return ( (char *)queue + queue->tail_offset );
 }
 
+
+/**
+ * @brief queue_push_common Pushes an element into a queue. The behaviour
+ *                          in case of the queue full condition is determined
+ *                          by a boolean parameter flag.
+ *                          Common part for queue_push and queue_try_push
+ *                          fucntions.
+ *
+ * @note This function is thread-safe.
+ *
+ * @param[in,out] queue       The queue into which a new element will be pushed.
+ * @param[in]     data        A provided data.
+ * @param[in]     data_size   A size of the provided data.
+ * @param[in]     should_wait Flag defining blocking/non-blocking behaviour.
+ *
+ * @return  0: the element pushed successfully into the queue;
+ *         -1: incorrect input parameters provided or, in case of
+ *             should_wait == true, queue is full.
+ */
 static int queue_push_common(queue_t *queue,
                              const char *data,
                              size_t data_size,
@@ -151,14 +206,48 @@ static int queue_push_common(queue_t *queue,
         return 0;
 }
 
+
+/**
+ * Blocking queue push operation.
+ * See queue.h for complete description.
+ */
 int queue_push(queue_t *queue, const char *data, size_t data_size) {
         return queue_push_common(queue, data, data_size, 1);
 }
 
+
+/**
+ * Non-blocking queue push operation.
+ * See queue.h for complete description.
+ */
 int queue_try_push(queue_t *queue, const char *data, size_t data_size) {
         return queue_push_common(queue, data, data_size, 0);
 }
 
+
+/**
+ * @brief queue_pop_common Fills provided buffers for a data and a data's size
+ *                         with the front queue element's data and size
+ *                         correspondingly and then removes this element from
+ *                         the queue. The behaviour in case of the queue empty
+ *                         condition is determined by a boolean parameter flag.
+ *                         Common part for queue_pop and queue_try_pop
+ *                         fucntions.
+ *
+ * @note This function is thread-safe.
+ *
+ * @param[in,out] queue       The queue whose front element will be
+ *                            returned and removed.
+ * @param[out]    data        Pointer to a buffer of an appropriate size.
+ * @param[in,out] data_size   Pointer to a buffer where the data's size
+ *                            will be written.
+ * @param[in]     should_wait Flag defining blocking/non-blocking behaviour.
+ *
+ * @return  0: data has been writtem to provided buffer, data size pointer
+ *             updated and element removed from the queue;
+ *         -1: incorrect input parameters provided or, in case of
+ *             should_wait == true, queue is empty.
+ */
 static int queue_pop_common(queue_t *queue,
                             char *data,
                             size_t *data_size,
@@ -217,6 +306,11 @@ static int queue_pop_common(queue_t *queue,
         return 0;
 }
 
+
+/**
+ * Blocking queue pop operation.
+ * See queue.h for complete description.
+ */
 int queue_pop(queue_t *queue,
               char *data,
               size_t *data_size) {
@@ -224,6 +318,11 @@ int queue_pop(queue_t *queue,
         return queue_pop_common(queue, data, data_size, 1);
 }
 
+
+/**
+ * Non-blocking queue pop operation.
+ * See queue.h for complete description.
+ */
 int queue_try_pop(queue_t *queue,
                   char *data,
                   size_t *data_size) {
@@ -231,9 +330,10 @@ int queue_try_pop(queue_t *queue,
         return queue_pop_common(queue, data, data_size, 0);
 }
 
+
 /**
- * @brief queue_init Allocates memory for a queue_t data structure and
- *                   initializes its members.
+ * Initialize queue data structure.
+ * See queue.h for complete description.
  */
 int queue_init(queue_t **queue_p,
                size_t max_size,
@@ -365,12 +465,10 @@ int queue_init(queue_t **queue_p,
         return 0;
 }
 
+
 /**
- * @brief queue_destroy Frees all memory allocated for a given queue.
- *
- * @warning This function is not thread-safe.
- *
- * @param[out] queue Pointer to a queue's structure to be freed.
+ * Destroy queue data structure and free resources.
+ * See queue.h for complete description.
  */
 void queue_destroy(queue_t *queue) {
         if (queue == NULL) {
@@ -385,6 +483,3 @@ void queue_destroy(queue_t *queue) {
                 /* queue structure is corrupted */
         }
 }
-
-
-
