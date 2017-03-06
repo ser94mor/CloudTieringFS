@@ -44,35 +44,32 @@ SRC_DIR    := src
 app_SUBDIR := app
 lib_SUBDIR := lib
 tst_SUBDIR := tst
+com_SUBDIR := com
 
 
 ### lists of source files
 src_func  = $(wildcard ${SRC_DIR}/$($(1)_SUBDIR)/*.c)
-lib_SRC  := $(call src_func,lib)
-app_SRC  := $(call src_func,app)
-tst_SRC  := $(call src_func,tst)
+com_SRC  := $(call src_func,com)
+lib_SRC  := $(call src_func,lib) ${com_SRC}
+app_SRC  := $(call src_func,app) ${com_SRC}
+tst_SRC  := $(call src_func,tst) \
+            $(filter-out ${SRC_DIR}/${app_SUBDIR}/daemon.c,${app_SRC})
 
 lib_MAP  := $(wildcard ${SRC_DIR}/${lib_SUBDIR}/*.map)
 
 ### lists of produced objects
-obj_func  = $(subst ${SRC_DIR},${BIN_DIR},$($(1)_SRC:.c=.o))
+obj_func  = $(subst ${com_SUBDIR},${$(1)_SUBDIR},\
+                    $(subst ${SRC_DIR},${BIN_DIR},$($(1)_SRC:.c=.o)))
+
 lib_OBJ  := $(call obj_func,lib)
 app_OBJ  := $(call obj_func,app)
-tst_OBJ  := $(call obj_func,tst) \
-            $(filter-out ${BIN_DIR}/${app_SUBDIR}/daemon.o,${app_OBJ})
+tst_OBJ  := $(call obj_func,tst)
 
 
 # dependencies
 lib_DEP := dl rt
 app_DEP := dotconf s3 rt
 tst_DEP := ${app_DEP}
-
-
-# include dirs
-inc_func = ${INC_DIR}/${$(1)_SUBDIR}
-lib_INC := $(call inc_func,lib)
-app_INC := $(call inc_func,app)
-tst_INC := $(call inc_func,tst)
 
 
 ### compiler
@@ -91,6 +88,13 @@ app_CC_FLAGS_LNK  := ${CC_FLAGS_LNK_COMMON} $(addprefix -l,${app_DEP})
 tst_CC_FLAGS_LNK  := ${CC_FLAGS_LNK_COMMON} $(addprefix -l,${tst_DEP})
 
 
+### helper functions
+
+# find source file for *.o file
+# (e.g. for bin/app/bar.o: src/app/bar.c or src/com/bar.c ?)
+choose_file = $(wildcard ${SRC_DIR}/$(1)/$(2).c ${SRC_DIR}/${com_SUBDIR}/$(2).c)
+
+
 ### targets
 .SECONDEXPANSION:
 all: app lib tst validate
@@ -100,7 +104,7 @@ app lib tst: %: $${$$@_OBJ} ${BIN_DIR}/%/%.out
 	@ln --force ${BIN_DIR}/$@/$@.out ${BIN_DIR}/${$@_NAME}
 
 
-${BIN_DIR}/%.o: ${SRC_DIR}/%.c | ${BIN_DIR}/$$(*D)
+${BIN_DIR}/%.o: $$(call choose_file,$$(*D),$$(*F)) | ${BIN_DIR}/$$(*D)
 	${CC} ${$(*D)_CC_FLAGS_CMPL} -o $@ $<
 
 
