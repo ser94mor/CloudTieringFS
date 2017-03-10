@@ -34,19 +34,6 @@
 #include "ops.h"
 #include "log.h"
 
-/* the constant representing extended attributes namespace */
-#define XATTR_NAMESPACE             "trusted"
-
-/* a list of all possible extended attributes */
-#define XATTRS(action, sep)                                \
-        action(stub)        sep \
-        action(locked)      sep \
-        action(object_id)
-
-/* a macro-function producing full name of extended attribute */
-#define XATTR_KEY(elem) \
-        XATTR_NAMESPACE "." PROGRAM_NAME "." STRINGIFY(elem)
-
 /* enum of supported extended attributes */
 enum xattr_enum {
         XATTRS(ENUMERIZE, COMMA),

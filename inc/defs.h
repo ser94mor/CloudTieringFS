@@ -18,16 +18,6 @@
 #ifndef CLOUDTIERING_DEFS_H
 #define CLOUDTIERING_DEFS_H
 
-/*******************************************************************************
-* COMMON CONSTANTS                                                             *
-*******************************************************************************/
-
-/* constant representing string with program name */
-#define PROGRAM_NAME        "cloudtiering"
-
-/* buffer length for error messages; mostly for errno descriptions */
-#define ERR_MSG_BUF_LEN     1024
-
 
 /*******************************************************************************
 * MACROSES                                                                     *
@@ -93,5 +83,30 @@
 #define ENUMERIZE(elem, ...)         e_##elem
 #define STRINGIFY(elem, ...)         #elem
 #define MAP_TO_ONE(elem, ...)        1
+
+
+/*******************************************************************************
+* COMMON CONSTANTS                                                             *
+*******************************************************************************/
+
+/* constant representing string with program name */
+#define PROGRAM_NAME        "cloudtiering"
+
+/* buffer length for error messages; mostly for errno descriptions */
+#define ERR_MSG_BUF_LEN     1024
+
+/* the constant representing extended attributes namespace */
+#define XATTR_NAMESPACE             "trusted"
+
+/* a list of all possible extended attributes */
+#define XATTRS(action, sep)                                \
+        action(stub)        sep \
+        action(locked)      sep \
+        action(object_id)
+
+/* a macro-function producing full name of extended attribute */
+#define XATTR_KEY(elem) \
+        XATTR_NAMESPACE "." PROGRAM_NAME "." STRINGIFY(elem)
+
 
 #endif    /* CLOUDTIERING_DEFS_H */

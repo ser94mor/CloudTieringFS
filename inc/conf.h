@@ -30,6 +30,8 @@
 
 #include "defs.h"
 
+#define        CONF_SHM_OBJ    "/" PROGRAM_NAME "-conf"
+
 /* a list of sections' names in configuration file */
 #define SECTIONS(action, sep)     \
         action(General)      sep  \

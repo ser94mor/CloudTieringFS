@@ -45,7 +45,7 @@
 
 #include "defs.h"
 
-#define QUEUE_SHM_OBJ    "/" PROGRAM_NAME
+#define QUEUE_SHM_OBJ    "/" PROGRAM_NAME "-queue"
 
 /* a definition of a queue data structure */
 typedef struct {

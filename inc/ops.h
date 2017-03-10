@@ -26,6 +26,8 @@
 * TODO: write description                                                      *
 *******************************************************************************/
 
+#include <sys/types.h>
+
 #include "defs.h"
 
 /* a list of supported protocols */
