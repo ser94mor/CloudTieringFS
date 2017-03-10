@@ -22,10 +22,12 @@
 #include <limits.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <pthread.h>
 #include <attr/xattr.h>
 
 #include "defs.h"
 #include "syms.h"
+#include "queue.h"
 
 /* enum of supported extended attributes */
 enum xattr_enum {
@@ -37,12 +39,20 @@ static const char *xattr_str[] = {
         XATTRS(XATTR_KEY, COMMA),
 };
 
+/* pointer to the first priority download queue in shared memory */
+static queue_t *queue = NULL;
+
+/* functions for which this library has wrappers */
 static symbols_t symbols = { 0 };
+
+symbols_t *get_syms( void ) {
+        return &symbols;
+}
 
 /* This function creates a table of pointers to glibc functions for all
  * of the io system calls so they can be called when needed
  */
-void __attribute__ ((constructor)) cloudtiering_init_syms(void) {
+void __attribute__ ((constructor)) init_syms(void) {
         symbols.open       = dlsym( RTLD_NEXT, "open"       );
         symbols.open64     = dlsym( RTLD_NEXT, "open64"     );
         symbols.openat     = dlsym( RTLD_NEXT, "openat"     );
@@ -59,39 +69,10 @@ void __attribute__ ((constructor)) cloudtiering_init_syms(void) {
         symbols.fadvise    = dlsym( RTLD_NEXT, "fadvise"    );
         symbols.fadvise64  = dlsym( RTLD_NEXT, "fadvise64"  );
 
-        symbols.fopen      = dlsym( RTLD_NEXT, "fopen"   );
-        symbols.freopen    = dlsym( RTLD_NEXT, "freopen" );
+        symbols.fopen      = dlsym( RTLD_NEXT, "fopen"      );
+        symbols.freopen    = dlsym( RTLD_NEXT, "freopen"    );
 }
 
-/**
- * According to Linux Programmer's Manual system call "realpath" has
- * can return the following errors:
- *     [ EACCES, EINVAL, EIO, ELOOP, ENAMETOOLONG, ENOENT, ENOTDIR, ENOMEM ]
- *
- * This is a subset of error codes that "open" call can return but the cause
- * of the errors are sometimes different and such cases should be carefully
- * handled to preserve a correct semantics. Below is a mapping of errors
- * with similar code from "realpath" and "open".
- *
- * EACCESS - "open" semantics includes "realpath" semantics for this error code.
- * EINVAL - "open" semantics and "realpath" semantics differ; "realpath" returns
- *          this error when at least one of the arguments is NULL, but "open"
- *          should return EFAULT in case path argument is NULL.
- * EIO - "open" does not return this error, "realpath" does. An I/O error occurred while reading from the filesystem.
- */
-//int open(const char *path, int flags, ...) {
-//        char abs_path[PATH_MAX];
-//        if ( realpath( path, abs_path ) == NULL ) {
-//
-//                /* path is NULL */
-//                if ( errno == EINVAL ) {
-//                        errno = EFAULT; /* error for open */
-//                } else if ( errno == ) {
-//
-//                }
-//                return -1;
-//        }
-//}
 
 /**
  * @brief is_file_local Check a location of file (local or remote).
@@ -105,7 +86,7 @@ void __attribute__ ((constructor)) cloudtiering_init_syms(void) {
  *          0: if file is in remote storage
  *         -1: error happen during an attempt to get extended attribute's value
  */
-static int is_file_local( const char *path ) {
+int is_file_local( const char *path ) {
 
         if ( getxattr( path, xattr_str[e_stub], NULL, 0 ) == -1 ) {
                 if (    ( errno == ENOATTR )
@@ -129,8 +110,4 @@ static int is_file_local( const char *path ) {
 
         /* e_stub atribute is set which means that file is remote */
         return 0;
-}
-
-int open(const char *path, int flags, ...) {
-
 }

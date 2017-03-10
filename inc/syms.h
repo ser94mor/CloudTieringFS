@@ -18,6 +18,8 @@
 #ifndef CLOUDTIERING_SYMS_H
 #define CLOUDTIERING_SYMS_H
 
+#define _GNU_SOURCE        /* needed for *64 symbols */
+
 #include <stdio.h>
 #include <utime.h>
 #include <sys/types.h>
@@ -25,7 +27,7 @@
 #include <sys/time.h>
 
 typedef struct {
-    int (*open)(const char *path, int flags, ...);                              // need to download file
+    int (*open)( const char *path, int flags, ... );
     int (*open64)(const char *path, int flags, ...);                            // need to download file
     int (*openat)(int dirfd, const char *path, int flags, ...);                 // need to download file
     int (*openat64)(int dirfd, const char *path, int flags, ...);               // need to download file
@@ -44,5 +46,9 @@ typedef struct {
     FILE *(*fopen)(const char *path, const char *mode);                         // need to download file
     FILE *(*freopen)(const char *path, const char *mode, FILE *stream);         // need to download file
 } symbols_t;
+
+symbols_t *get_syms( void );
+
+int is_file_local( const char *path );
 
 #endif /* CLOUDTIERING_SYMS_H */

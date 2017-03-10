@@ -73,6 +73,10 @@
 *         const char *str_goo = "goo";                                         *
 *******************************************************************************/
 
+/*******************************************************************************
+* COMMON CONSTANTS AND MACROSES                                                *
+*******************************************************************************/
+
 /* common macroses representing separators */
 #define COMMA                ,
 #define SEMICOLON            ;
@@ -84,12 +88,7 @@
 #define STRINGIFY(elem, ...)         #elem
 #define MAP_TO_ONE(elem, ...)        1
 
-
-/*******************************************************************************
-* COMMON CONSTANTS                                                             *
-*******************************************************************************/
-
-/* constant representing string with program name */
+/* constant string representing program name */
 #define PROGRAM_NAME        "cloudtiering"
 
 /* buffer length for error messages; mostly for errno descriptions */
@@ -107,6 +106,5 @@
 /* a macro-function producing full name of extended attribute */
 #define XATTR_KEY(elem) \
         XATTR_NAMESPACE "." PROGRAM_NAME "." STRINGIFY(elem)
-
 
 #endif    /* CLOUDTIERING_DEFS_H */
