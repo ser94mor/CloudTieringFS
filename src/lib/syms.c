@@ -23,7 +23,9 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <pthread.h>
+#include <fcntl.h>          /* defines O_* constants */
 #include <attr/xattr.h>
+#include <sys/mman.h>
 
 #include "defs.h"
 #include "syms.h"
@@ -44,6 +46,8 @@ static queue_t *queue = NULL;
 
 /* functions for which this library has wrappers */
 static symbols_t symbols = { 0 };
+
+static pthread_once_t once_control = PTHREAD_ONCE_INIT;
 
 symbols_t *get_syms( void ) {
         return &symbols;
@@ -110,4 +114,36 @@ int is_file_local( const char *path ) {
 
         /* e_stub atribute is set which means that file is remote */
         return 0;
+}
+
+static void queue_open_once( void ) {
+        if ( queue == NULL ) {
+                int fd = shm_open(QUEUE_SHM_OBJ, O_RDWR, 0);
+                if (fd == -1) {
+                        exit(1);
+                }
+
+                struct stat sb;
+                if (fstat(fd, &sb) == -1) {
+                        exit(1);
+                }
+
+                queue = mmap(NULL,
+                             sb.st_size,
+                             PROT_READ | PROT_WRITE,
+                             MAP_SHARED,
+                             fd,
+                             0);
+
+                if (queue == MAP_FAILED) {
+                        exit(1);
+                }
+        }
+}
+
+int initiate_file_download( const char *path ) {
+        /* open shared memory object with queue if not already */
+        pthread_once(&once_control, queue_open_once);
+
+
 }
