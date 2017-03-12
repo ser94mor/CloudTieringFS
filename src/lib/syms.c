@@ -22,6 +22,7 @@
 #include <limits.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <string.h>
 #include <pthread.h>
 #include <fcntl.h>          /* defines O_* constants */
 #include <attr/xattr.h>
@@ -53,10 +54,15 @@ symbols_t *get_syms( void ) {
         return &symbols;
 }
 
+
 /* This function creates a table of pointers to glibc functions for all
  * of the io system calls so they can be called when needed
  */
 void __attribute__ ((constructor)) init_syms(void) {
+        /* we do not check the return result of dlsym() here because we do
+           do not know what functions from this structure are actually needed
+           by the program that uses this library; check for return result will
+           be performed in the places of actual invokation */
         symbols.open       = dlsym( RTLD_NEXT, "open"       );
         symbols.open64     = dlsym( RTLD_NEXT, "open64"     );
         symbols.openat     = dlsym( RTLD_NEXT, "openat"     );
@@ -118,32 +124,68 @@ int is_file_local( const char *path ) {
 
 static void queue_open_once( void ) {
         if ( queue == NULL ) {
-                int fd = shm_open(QUEUE_SHM_OBJ, O_RDWR, 0);
-                if (fd == -1) {
-                        exit(1);
+                int fd = shm_open( QUEUE_SHM_OBJ, O_RDWR, 0 );
+                if ( fd == -1 ) {
+                        /* initialization result will be checked
+                           in the caller */
+                        return;
                 }
 
                 struct stat sb;
-                if (fstat(fd, &sb) == -1) {
-                        exit(1);
+                if ( fstat( fd, &sb ) == -1 ) {
+                        /* initialization result will be checked
+                           in the caller */
+                        return;
                 }
 
-                queue = mmap(NULL,
-                             sb.st_size,
-                             PROT_READ | PROT_WRITE,
-                             MAP_SHARED,
-                             fd,
-                             0);
+                queue = mmap( NULL,
+                              sb.st_size,
+                              PROT_READ | PROT_WRITE,
+                              MAP_SHARED,
+                              fd,
+                              0 );
 
-                if (queue == MAP_FAILED) {
-                        exit(1);
+                if ( queue == MAP_FAILED ) {
+                        queue = NULL;
+
+                        /* initialization result will be checked
+                           in the caller */
+                        return;
                 }
         }
 }
 
+/**
+ * @brief initiate_file_download Push file in the first priority download queue.
+ *
+ * @note Set errno to ENOMEM since this is the only kind of error
+ *       within open-calls family that reflects system error.
+ *
+ * @param[in] path Path to a file to be pushed to queue.
+ *
+ * @return  0: file has been successfully pushed to queue;
+ *         -1: error happen during opening of shared memory object containing
+ *             queue or queue push operation failed.
+ */
 int initiate_file_download( const char *path ) {
         /* open shared memory object with queue if not already */
-        pthread_once(&once_control, queue_open_once);
+        pthread_once( &once_control, queue_open_once );
+        if ( queue == NULL ) {
+                /* error happen during mapping of queue from shared memory */
+                 errno = ENOMEM;
+                return -1;
+        }
 
+        if ( queue_push( queue, path, ( strlen( path ) + 1 ) ) == -1 ) {
+                /* this is very unlikely situation with blocking
+                   push operation */
+                errno = ENOMEM;
+                return -1;
+        }
 
+        return 0;
+}
+
+int poll_file_location( const char *path, int should_wait ) {
+        return -1;
 }

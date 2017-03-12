@@ -179,7 +179,7 @@ static int queue_push_common(queue_t *queue,
 
         pthread_mutex_unlock(&queue->size_mutex);
 
-        /* a begining and an end of a buffer are logically identical */
+        /* a beginning and an end of a buffer are logically identical */
         queue->tail_offset = (queue->tail_offset ==
                              (queue->buf_offset + queue->buf_size)) ?
                              queue->buf_offset : queue->tail_offset;
@@ -229,10 +229,10 @@ int queue_try_push(queue_t *queue, const char *data, size_t data_size) {
  * @brief queue_pop_common Fills provided buffers for a data and a data's size
  *                         with the front queue element's data and size
  *                         correspondingly and then removes this element from
- *                         the queue. The behaviour in case of the queue empty
+ *                         the queue. The behavior in case of the queue empty
  *                         condition is determined by a boolean parameter flag.
  *                         Common part for queue_pop and queue_try_pop
- *                         fucntions.
+ *                         functions.
  *
  * @note This function is thread-safe.
  *
@@ -241,9 +241,9 @@ int queue_try_push(queue_t *queue, const char *data, size_t data_size) {
  * @param[out]    data        Pointer to a buffer of an appropriate size.
  * @param[in,out] data_size   Pointer to a buffer where the data's size
  *                            will be written.
- * @param[in]     should_wait Flag defining blocking/non-blocking behaviour.
+ * @param[in]     should_wait Flag defining blocking/non-blocking behavior.
  *
- * @return  0: data has been writtem to provided buffer, data size pointer
+ * @return  0: data has been written to provided buffer, data size pointer
  *             updated and element removed from the queue;
  *         -1: incorrect input parameters provided or, in case of
  *             should_wait == true, queue is empty.
@@ -280,13 +280,13 @@ static int queue_pop_common(queue_t *queue,
                 return -1;
         }
 
-        /* set a value of the data's size */
+        /* set a value of the data size */
         *data_size = elem_sz;
 
         /* copy data to provided buffer */
         memcpy(data, queue_elem_data(queue_head(queue)), *data_size);
 
-        /* a begining and an end of a buffer are logically identical;
+        /* a beginning and an end of a buffer are logically identical;
            update the queue's internal state */
         queue->head_offset = (queue->head_offset ==
                              (queue->buf_offset + queue->buf_size -
