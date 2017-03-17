@@ -3,5 +3,4 @@
 
 ## Contributors
 *Make a contribution to see your name in this list.*
-*You are welcome!*
 
