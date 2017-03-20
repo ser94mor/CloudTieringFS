@@ -187,5 +187,13 @@ int initiate_file_download( const char *path ) {
 }
 
 int poll_file_location( const char *path, int should_wait ) {
-        return -1;
+        /* TODO: completely rewrite; current implementation do many kernel
+                 calls in the loop which is unacceptable */
+        int ret = -1;
+
+        do {
+                ret = is_file_local( path );
+        } while ( ret == 0 );
+
+        return ( ret == -1 ) ? -1 : 0;
 }

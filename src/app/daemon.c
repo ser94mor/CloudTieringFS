@@ -63,20 +63,15 @@ static void *transfer_files_loop(pair_t *pair,
                 }
 
                 if (pop_res == -1 && secondary_queue != NULL) {
-                        pop_res = queue_pop(secondary_queue,
-                                            path,
-                                            &path_size);
+                        pop_res = queue_try_pop(secondary_queue,
+                                                path,
+                                                &path_size);
                 }
 
                 if (pop_res == -1) {
-                        /* if the program's logic is correct these statements
-                           will never be executed */
-
-                        LOG(ERROR,
-                            "corrupted queue_tuple_t structure "
-                            "[reason: at least one member should be assigned]");
-
-                        exit(EXIT_FAILURE);
+                        /* both queues are empty */
+                        pthread_testcancel();
+                        continue;
                 }
 
                 if (action(path) == -1) {

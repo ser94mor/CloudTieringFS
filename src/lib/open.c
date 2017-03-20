@@ -28,7 +28,6 @@
 /* stat() errors:
    EACCES EBADF EFAULT ELOOP ENAMETOOLONG ENOENT ENOMEM ENOTDIR EOVERFLOW */
 int open( const char *path, int flags, ... ) {
-
         /* in case open call was not initialized in the library constructor
            return ENOMEM as it is the only error that indicates real system
            problem */

@@ -95,7 +95,7 @@
 #define ERR_MSG_BUF_LEN     1024
 
 /* the constant representing extended attributes namespace */
-#define XATTR_NAMESPACE             "trusted"
+#define XATTR_NAMESPACE             "user"
 
 /* a list of all possible extended attributes */
 #define XATTRS(action, sep)                                \

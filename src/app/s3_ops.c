@@ -283,7 +283,7 @@ static int s3_create_bucket(void) {
 static int s3_put_object_data_callback(
         int buffer_size, char *buffer, void *callback_data) {
         struct s3_put_object_callback_data *data =
-            (struct s3_put_object_callback_data *)
+                (struct s3_put_object_callback_data *)
                                    (((struct s3_cb_data *)callback_data)->data);
 
         int ret = 0;
@@ -300,9 +300,11 @@ static int s3_put_object_data_callback(
 
 static S3Status s3_get_object_data_callback(
         int buffer_size, const char *buffer, void *callback_data) {
-        FILE *outfile = (FILE *)(((struct s3_cb_data *)callback_data)->data);
+        struct s3_get_object_callback_data *data =
+                (struct s3_get_object_callback_data *)
+                                   (((struct s3_cb_data *)callback_data)->data);
 
-        size_t wrote = fwrite(buffer, 1, buffer_size, outfile);
+        size_t wrote = fwrite(buffer, 1, buffer_size, data->file);
         return ((wrote < (size_t)buffer_size) ? S3StatusAbortedByCallback :
                                                 S3StatusOK);
 }
@@ -437,7 +439,7 @@ int s3_download(const char *path) {
 
         do {
                 S3_get_object(&g_bucket_context,
-                              path,
+                              s3_get_xattr_value(path),
                               NULL,
                               0,
                               0,
@@ -465,25 +467,6 @@ int s3_download(const char *path) {
                 }
 
                 LOG(ERROR, "failed to close file %s: %s", path, err_buf);
-
-                ret = -1;
-        }
-
-        /* remove location attribute */
-        if (removexattr(path, "object_id") == -1) {
-                /* non-existance of location attribute indicates an error
-                   in logic of this program */
-
-                /* strerror_r() with very low probability can fail;
-                   ignore such failures */
-                strerror_r(errno, err_buf, ERR_MSG_BUF_LEN);
-
-                LOG(ERROR,
-                    "failed to remove extended attribute %s of file %s "
-                    "[reason: %s]",
-                    "object_id",
-                    path,
-                    err_buf);
 
                 ret = -1;
         }

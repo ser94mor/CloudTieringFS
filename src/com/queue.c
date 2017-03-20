@@ -370,12 +370,20 @@ int queue_init(queue_t **queue_p,
                 }
         } else {
                 /* queue will be used by many processes */
+                int oflags =  O_CREAT | O_EXCL | O_RDWR;
+                mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP |
+                              S_IWGRP | S_IROTH | S_IWOTH;
+                mode_t mask = S_IXUSR | S_IXGRP | S_IXOTH;
+
+                /* temporary set mask for the follwing shm_open call */
+                mask = umask(mask);
 
                 /* create shared memory object */
-                int fd = shm_open(shm_obj,
-                                  O_CREAT | O_EXCL | O_RDWR,
-                                  S_IRUSR | S_IWUSR | S_IRGRP |
-                                  S_IWGRP | S_IROTH | S_IWOTH);
+                int fd = shm_open(shm_obj, oflags, mode);
+
+                /* restore the previous mask value */
+                umask(mask);
+
                 if (fd == -1) {
                         return -1;
                 }

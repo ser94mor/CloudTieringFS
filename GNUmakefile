@@ -55,7 +55,6 @@ app_SRC  := $(call src_func,app) ${com_SRC}
 tst_SRC  := $(call src_func,tst) \
             $(filter-out ${SRC_DIR}/${app_SUBDIR}/daemon.c,${app_SRC})
 
-lib_MAP  := $(wildcard ${SRC_DIR}/${lib_SUBDIR}/*.map)
 
 ### lists of produced objects
 obj_func  = $(subst ${com_SUBDIR},${$(1)_SUBDIR},\
@@ -83,7 +82,7 @@ tst_CC_FLAGS_CMPL := ${CC_FLAGS_CMPL_COMMON}
 
 lib_CC_FLAGS_LNK  := \
         ${CC_FLAGS_LNK_COMMON} $(addprefix -l,${lib_DEP}) \
-        -shared -Wl,-Bsymbolic,-soname,${lib_SONAME},--version-script,${lib_MAP}
+        -shared -Wl,-Bsymbolic,-soname,${lib_SONAME}
 app_CC_FLAGS_LNK  := ${CC_FLAGS_LNK_COMMON} $(addprefix -l,${app_DEP})
 tst_CC_FLAGS_LNK  := ${CC_FLAGS_LNK_COMMON} $(addprefix -l,${tst_DEP})
 
