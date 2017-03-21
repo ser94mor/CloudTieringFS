@@ -312,12 +312,13 @@ static S3Status s3_get_object_data_callback(
 /**
  * @brief s3_upload Uploads file's data to s3 remote storage.
  *
- * @param[in] path Path to file which data is going to be uploaded.
+ * @param[in] path      Path to file which data is going to be uploaded.
+ * @param[in] object_id Object id of this file in the remote object storage.
  *
  * @return  0: file's data has been successfully uploaded to s3 remote storage
  *         -1: error happen during process of upload of file's data
  */
-int s3_upload(const char *path) {
+int s3_upload(const char *path, const char *object_id) {
         int retries = get_conf()->s3_operation_retries;
         int ret = 0; /* success by default */
         struct s3_put_object_callback_data put_object_data;
@@ -365,7 +366,7 @@ int s3_upload(const char *path) {
 
         do {
                 S3_put_object(&g_bucket_context,
-                              s3_get_xattr_value(path),
+                              object_id,
                               put_object_data.content_length,
                               NULL,
                               NULL,
@@ -406,7 +407,7 @@ int s3_upload(const char *path) {
  * @return  0: file's data has been successfully downloaded
  *         -1: error happen during file's data download
  */
-int s3_download(const char *path) {
+int s3_download(const char *path, const char *object_id) {
         int retries = get_conf()->s3_operation_retries;
         int ret = 0; /* success by default */
         struct s3_get_object_callback_data get_object_data;
@@ -439,7 +440,7 @@ int s3_download(const char *path) {
 
         do {
                 S3_get_object(&g_bucket_context,
-                              s3_get_xattr_value(path),
+                              object_id,
                               NULL,
                               0,
                               0,

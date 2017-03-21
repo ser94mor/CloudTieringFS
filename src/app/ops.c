@@ -247,8 +247,12 @@ int upload_file( const char *path ) {
                 return 0;
         }
 
+        /* calculate object id (the key) for the remote object storage */
+        const char *object_id     = get_ops()->get_xattr_value( path );
+        size_t object_id_max_size = get_ops()->get_xattr_size();
+
         /* upload file's data to remote storage */
-        if ( get_ops()->upload( path ) == -1 ) {
+        if ( get_ops()->upload( path, object_id ) == -1 ) {
                 LOG( ERROR,
                      "[upload_file] aborting file %s upload operation because "
                      "file's data upload failed",
@@ -263,8 +267,8 @@ int upload_file( const char *path ) {
         /* set object id to a corresponding attribute */
         if ( set_xattr( path,
                         e_object_id,
-                        get_ops()->get_xattr_value( path ),
-                        get_ops()->get_xattr_size(),
+                        (void *)object_id,
+                        object_id_max_size,
                         XATTR_CREATE ) == -1 ) {
                 LOG( ERROR,
                      "[upload_file] aborting file %s upload operation because "
@@ -354,8 +358,26 @@ int download_file( const char *path ) {
                 return 0;
         }
 
+        size_t object_id_max_size = get_ops()->get_xattr_size();
+        char object_id[object_id_max_size];
+
+        if ( get_xattr_tunable( path,
+                                e_object_id,
+                                object_id,
+                                object_id_max_size,
+                                0 ) == -1 ) {
+                LOG( ERROR,
+                     "[download_file] aborting file %s download operation "
+                     "because failed to obtain value of %s extended attribute",
+                     xattr_str[e_object_id],
+                     path );
+
+                unlock_file( path );
+                return -1;
+        }
+
         /* download file's data to local storage */
-        if ( get_ops()->download( path ) == -1 ) {
+        if ( get_ops()->download( path, object_id ) == -1 ) {
                 LOG( ERROR,
                      "[download_file] aborting file %s download operation "
                      "because file's data download failed",

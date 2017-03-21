@@ -53,19 +53,19 @@ enum protocol_enum {
 
 typedef struct {
         enum protocol_enum protocol;
-        int    (*connect)(void);
-        int    (*download)(const char *path);
-        int    (*upload)(const char *path);
-        void   (*disconnect)(void);
-        char  *(*get_xattr_value)(const char *path);
-        size_t (*get_xattr_size)(void);
+        int    (*connect) ( void );
+        int    (*download)( const char *path, const char *object_id );
+        int    (*upload)  ( const char *path, const char *object_id );
+        void   (*disconnect)( void );
+        char  *(*get_xattr_value)( const char *path );
+        size_t (*get_xattr_size) ( void );
 } ops_t;
 
 ops_t  *get_ops();
 
 int    s3_connect(void);
-int    s3_download(const char *path);
-int    s3_upload(const char *path);
+int    s3_download(const char *path, const char *object_id);
+int    s3_upload(const char *path, const char *object_id);
 void   s3_disconnect(void);
 char  *s3_get_xattr_value(const char *path);
 size_t s3_get_xattr_size(void);
