@@ -4,6 +4,15 @@ between a POSIX-compliant file system (local or distributed)
 and a cloud object storage at the file level while maintaining the POSIX
 semantics.
 
+
+### Warning
+Do not use this software on your production cluster.
+**cloudtiering** is under active development and hence unstable.
+There is a risk of a data corruption.
+
+Nevertheless, curious minds are welcome to try it on their test clusters.
+
+
 ### Installation
 To start daemon run:
 ```
@@ -15,11 +24,13 @@ $> sudo S3_ACCESS_KEY_ID='<access-key-id>' \
 Set `LD_PRELOAD` variable globally
 ```
 $> export LD_PRELOAD=$PWD/bin/libcloudtiering.so
+$> <executable>
 ```
-or per process
+or individually, per process
 ```
 $> LD_PRELOAD=$PWD/bin/libcloudtiering.so <executable>
 ```
+
 
 ### Dependencies
 Below is a list of tools and libraries that should be installed on the system
