@@ -97,6 +97,16 @@
 /* the constant representing extended attributes namespace */
 #define XATTR_NAMESPACE             "user"
 
+/* template for symlink pointing to the opened file descriptor;
+   the lengths of pid_t and int are certainly lesser than
+   unsigned loag long int */
+#define PROC_PID_FD_FD_PATH_TEMPLATE        "/proc/%llu/fd/%llu"
+
+/* the maximum possible length of proc_path including '\0' character;
+   20 characters to represent pid_t and int is more than enough on any
+   possible system */
+#define PROC_PID_FD_FD_PATH_MAX_LEN         ( 10 + 20 + 20 + 1 )
+
 /* a list of all possible extended attributes */
 #define XATTRS(action, sep)                                \
         action(stub)        sep \

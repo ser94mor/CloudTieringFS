@@ -24,9 +24,11 @@
 #include <errno.h>
 #include <string.h>
 #include <pthread.h>
+#include <unistd.h>
 #include <fcntl.h>          /* defines O_* constants */
 #include <attr/xattr.h>
 #include <sys/mman.h>
+#include <sys/types.h>
 
 #include "defs.h"
 #include "syms.h"
@@ -49,6 +51,9 @@ static queue_t *queue = NULL;
 static symbols_t symbols = { 0 };
 
 static pthread_once_t once_control = PTHREAD_ONCE_INIT;
+
+/* the pid of this process; will be initialized later once */
+static pid_t pid = -1;
 
 symbols_t *get_syms( void ) {
         return &symbols;
@@ -90,15 +95,15 @@ void __attribute__ ((constructor)) init_syms(void) {
  * @note Operation is atomic according to
  *       http://man7.org/linux/man-pages/man7/xattr.7.html.
  *
- * @param[in] path Path to file to check location.
+ * @param[in] fd File descriptor to check location.
  *
  * @return  1: if file is in local storage
  *          0: if file is in remote storage
  *         -1: error happen during an attempt to get extended attribute's value
  */
-int is_file_local( const char *path ) {
+int is_file_local( int fd ) {
 
-        if ( getxattr( path, xattr_str[e_stub], NULL, 0 ) == -1 ) {
+        if ( fgetxattr( fd, xattr_str[e_stub], NULL, 0 ) == -1 ) {
                 if (    ( errno == ENOATTR )
                      || ( errno == ENOTSUP )
                      || ( errno == ERANGE ) ) {
@@ -122,7 +127,11 @@ int is_file_local( const char *path ) {
         return 0;
 }
 
-static void queue_open_once( void ) {
+static void init_vars_once( void ) {
+        /* set process' pid */
+        pid = getpid();
+
+        /* map shared memory region containing the queue */
         if ( queue == NULL ) {
                 int fd = shm_open( QUEUE_SHM_OBJ, O_RDWR, 0 );
                 if ( fd == -1 ) {
@@ -156,27 +165,34 @@ static void queue_open_once( void ) {
 }
 
 /**
- * @brief initiate_file_download Push file in the first priority download queue.
+ * @brief schedule_download Push file in the first priority download queue.
  *
  * @note Set errno to ENOMEM since this is the only kind of error
  *       within open-calls family that reflects system error.
  *
- * @param[in] path Path to a file to be pushed to queue.
+ * @param[in] fd File descriptor to calculate "proc-path" to be pushed to queue.
  *
  * @return  0: file has been successfully pushed to queue;
  *         -1: error happen during opening of shared memory object containing
  *             queue or queue push operation failed.
  */
-int initiate_file_download( const char *path ) {
+int schedule_download( int fd ) {
         /* open shared memory object with queue if not already */
-        pthread_once( &once_control, queue_open_once );
+        pthread_once( &once_control, init_vars_once );
         if ( queue == NULL ) {
                 /* error happen during mapping of queue from shared memory */
                  errno = ENOMEM;
                 return -1;
         }
 
-        if ( queue_push( queue, path, ( strlen( path ) + 1 ) ) == -1 ) {
+        char path[PROC_PID_FD_FD_PATH_MAX_LEN];
+        snprintf(path,
+                PROC_PID_FD_FD_PATH_MAX_LEN,
+                PROC_PID_FD_FD_PATH_TEMPLATE,
+                (unsigned long long int)pid,
+                (unsigned long long int)fd);
+
+        if ( queue_push( queue, path, PROC_PID_FD_FD_PATH_MAX_LEN ) == -1 ) {
                 /* this is very unlikely situation with blocking
                    push operation */
                 errno = ENOMEM;
@@ -186,13 +202,13 @@ int initiate_file_download( const char *path ) {
         return 0;
 }
 
-int poll_file_location( const char *path, int should_wait ) {
+int poll_file_location( int fd, int should_wait ) {
         /* TODO: completely rewrite; current implementation do many kernel
                  calls in the loop which is unacceptable */
         int ret = -1;
 
         do {
-                ret = is_file_local( path );
+                ret = is_file_local( fd );
         } while ( ret == 0 );
 
         return ( ret == -1 ) ? -1 : 0;

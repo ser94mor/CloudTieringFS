@@ -60,7 +60,7 @@ int open( const char *path, int flags, ... ) {
         /* we are here when open() call succeeded (i. e. fd != -1);
            we should determine whether file local or remote and if remote,
            schedule its download in daemon */
-        int ret = is_file_local( path );
+        int ret = is_file_local( fd );
 
         /* handle the case when the file is local */
         if ( ret && ( ret != -1 ) ) {
@@ -70,12 +70,12 @@ int open( const char *path, int flags, ... ) {
 
         /* handle the case when the file is remote */
         if ( ret == 0 ) {
-                if ( initiate_file_download( path ) == -1 ) {
+                if ( schedule_download( fd ) == -1 ) {
                         /* errno has been set inside that function */
                         return -1;
                 }
 
-                if ( poll_file_location( path , 0 ) == -1 ) {
+                if ( poll_file_location( fd , 0 ) == -1 ) {
                         /* errno has been set inside that function */
                         return -1;
                 }

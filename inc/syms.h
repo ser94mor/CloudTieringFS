@@ -49,8 +49,8 @@ typedef struct {
 
 symbols_t *get_syms( void );
 
-int is_file_local( const char *path );
-int initiate_file_download( const char *path );
-int poll_file_location( const char *path, int should_wait );
+int is_file_local( int fd );
+int schedule_download( int fd );
+int poll_file_location( int fd, int should_wait );
 
 #endif /* CLOUDTIERING_SYMS_H */
