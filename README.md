@@ -5,15 +5,29 @@ and a cloud object storage at the file level while maintaining the POSIX
 semantics.
 
 ### Installation
-TODO: instructions will be given in the next versions of this program.
+To start daemon run:
+```
+$> sudo S3_ACCESS_KEY_ID='<access-key-id>' \
+        S3_SECRET_ACCESS_KEY='<secret-access-key>' \
+   $PWD/bin/cloudtiering-daemon $PWD/conf/cloudtiering.conf
+```
 
+Set `LD_PRELOAD` variable globally
+```
+$> export LD_PRELOAD=$PWD/bin/libcloudtiering.so
+```
+or per process
+```
+$> LD_PRELOAD=$PWD/bin/libcloudtiering.so <executable>
+```
 
 ### Dependencies
 Below is a list of tools and libraries that should be installed on the system
 in order to enable code compilation. This list may be incomplete.
-- libs3
-- dotconf
-- gcc5
+- *s3* shared library (openSUSE 42.1: `libs3-2`, `libs3-devel`);
+- *dotconf* shared library (openSUSE 42.1: `dotconf`, `dotconf-devel`);
+- *gcc5* compiler (openSUSE 42.1: `gcc5`);
+- *proc* file system should be present on the system.
 
 
 ### Licensing
