@@ -21,10 +21,8 @@
 #define _GNU_SOURCE        /* needed for *64 symbols */
 
 #include <stdio.h>
-#include <utime.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/time.h>
 
 /* Since this library aims to be a POSIX-conformant, there is no need to
    implement LFS specification because it is an ptional feature in SUSv2+.
@@ -33,9 +31,11 @@
 typedef struct {
     int (*open)( const char *path, int flags, ... );
     int (*openat)(int dirfd, const char *path, int flags, ...);
-    int (*truncate)(const char *path, off_t length);                            // need to download file or remove extended attributes if truncated to 0
-    int (*stat)(const char *path, struct stat *buf);                            // need to override some structure members related to file'data
-    int (*fstatat)(int fd, const char *path, struct stat *buf, int flag);       // need to override some structure members related to file'data
+
+    int (*truncate)(const char *path, off_t length);
+
+    int (*stat)(const char *path, struct stat *buf);
+    int (*fstatat)(int fd, const char *path, struct stat *buf, int flag);
 
 
     FILE *(*fopen)(const char *path, const char *mode);                         // need to download file
