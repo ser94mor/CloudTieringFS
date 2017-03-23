@@ -25,38 +25,7 @@
 
 #include "syms.h"
 
-/* stat() errors:
-   EACCES EBADF EFAULT ELOOP ENAMETOOLONG ENOENT ENOMEM ENOTDIR EOVERFLOW */
-int open( const char *path, int flags, ... ) {
-        /* in case open call was not initialized in the library constructor
-           return ENOMEM as it is the only error that indicates real system
-           problem */
-        if ( get_syms()->open == NULL ) {
-                errno = ENOMEM;
-                return -1;
-        }
-
-        mode_t mode = 0; /* default mode value */
-
-        /* mode parameter is only relevant when O_CREAT or O_TMPFILE
-           specified in flags argument */
-        if (    ( ( flags & O_CREAT   ) == O_CREAT   )
-             || ( ( flags & O_TMPFILE ) == O_TMPFILE ) ) {
-                va_list ap;
-                va_start( ap, flags );
-                mode = va_arg( ap, mode_t );
-                va_end( ap );
-        }
-
-        /* make a call at first to get file descriptor first;
-           if failed, just return error and do no more actions */
-        int fd = get_syms()->open( path, flags, mode );
-
-        if ( fd == -1 ) {
-                /* proper errno was set in the open() call */
-                return fd;
-        }
-
+static inline int finish_open_common( int fd ) {
         /* we are here when open() call succeeded (i. e. fd != -1);
            we should determine whether file local or remote and if remote,
            schedule its download in daemon */
@@ -90,12 +59,86 @@ int open( const char *path, int flags, ... ) {
            errors to open() call errors to preserve semantics */
         if ( ret == -1 ) {
                 /* is_file_local() returned a error, hence stat() errors should
-                   be handled here */
-                /* TODO: handle stat(2) errors */
+                   be handled here; the only error that does not have analog in
+                   open() for our case (when we use file descriptor
+                   for fstat()) is EBADF;
+                   for nearly impossible situations, such as "during this call
+                   another thread called close() with this file descriptor",
+                   return EIO error, which is not specified as a possible return
+                   values of this call */
+                errno = ( errno == EBADFD ) ? EIO : errno;
                 return -1;
         }
 
         /* unreachable place */
-        errno = ENOMEM;
+        errno = EIO;
         return -1;
+}
+
+int open( const char *path, int flags, ... ) {
+        /* in case openat call was not initialized in the library constructor
+           return ELIBACC; open can not return such error in Linux
+           and the caller does not expect it and should fail, since we are
+           unable to handle this call */
+        if ( get_syms()->open == NULL ) {
+                errno = ELIBACC;
+                return -1;
+        }
+
+        /* open() will use mode only in case O_CREAT or O_TMPFILE flags
+           specified; there is no need the handle it here; for some cases
+           mode variable will simply contain rubbish, but it is ok */
+        mode_t mode;
+        va_list ap;
+        va_start( ap, flags );
+        mode = va_arg( ap, mode_t );
+        va_end( ap );
+
+        /* make a call at first to get file descriptor first;
+           if failed, just return error and do no more actions */
+        int fd = get_syms()->open( path, flags, mode );
+
+        if ( fd == -1 ) {
+                /* proper errno was set in the open() call */
+                return fd;
+        }
+
+        /* on errno will be set inside finish_open_common() */
+        return finish_open_common( fd );
+}
+
+int creat( const char *path, mode_t mode ) {
+        return open( path, O_CREAT | O_WRONLY | O_TRUNC, mode );
+}
+
+int openat( int dir_fd, const char *path, int flags, ... ) {
+        /* in case openat call was not initialized in the library constructor
+           return ELIBACC; openat can not return such error in Linux
+           and the caller does not expect it and should fail, since we are
+           unable to handle this call */
+        if ( get_syms()->openat == NULL ) {
+                errno = ELIBACC;
+                return -1;
+        }
+
+        /* openat() will use mode only in case O_CREAT or O_TMPFILE flags
+           specified; there is no need the handle it here; for some cases
+           mode variable will simply contain rubbish, but it is ok */
+        mode_t mode;
+        va_list ap;
+        va_start( ap, flags );
+        mode = va_arg( ap, mode_t );
+        va_end( ap );
+
+        /* make a call at first to get file descriptor first;
+           if failed, just return error and do no more actions */
+        int fd = get_syms()->openat( dir_fd, path, flags, mode );
+
+        if ( fd == -1 ) {
+                /* proper errno was set in the openat() call */
+                return fd;
+        }
+
+        /* on errno will be set inside finish_open_common() */
+        return finish_open_common( fd );
 }
