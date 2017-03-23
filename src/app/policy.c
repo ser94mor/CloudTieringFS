@@ -3,6 +3,7 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <fcntl.h>
 #include <unistd.h>
 #include <ftw.h>
 #include <string.h>
@@ -23,32 +24,57 @@
 static queue_t *in_queue  = NULL;
 static queue_t *out_queue = NULL;
 
-static int update_evict_queue(const char *fpath, const struct stat *sb,  int typeflag, struct FTW *ftwbuf) {
+static int update_evict_queue( const char *path,
+                               const struct stat *sb,
+                               int typeflag,
+                               struct FTW *ftwbuf ) {
+        /* since we mostly use file descriptors for file operations in other
+           places for certain reasons, use file descriptors here as well;
+           ignore errors of system calls, we do not want to fail the program
+           because of failures in background threads (such as this one) */
 
-        struct stat path_stat;
-        /* TODO: consider using lstat */
-        if (stat(fpath, &path_stat) == -1) {
+        /* cannot use O_PATH flag because some of the next operations will use
+           fgetxattr(3)
+           (see http://man7.org/linux/man-pages/man2/open.2.html) */
+        int fd  = open( path, O_RDWR );
+        if ( fd == -1 ) {
                 /* just continue with the next files; non-zero will
                    cause failure of nftw() */
                 return 0;
         }
 
-        if (is_valid_path(fpath) &&
-            is_file_local(fpath) &&
-            (path_stat.st_atime + EVICTION_TIMEOUT) < time(NULL)) {
+        struct stat path_stat;
+        if ( fstat( fd, &path_stat ) == -1) {
+                /* just continue with the next files; non-zero will
+                   cause failure of nftw() */
 
-                char *data = (char *)fpath;
-                size_t data_size = strlen(fpath) + 1;
+                if ( close( fd ) == -1 ) {
+                        /* TODO: consider to handle EINTR */
+                }
 
-                if (queue_push(out_queue, data, data_size) == -1) {
-                        LOG(ERROR,
-                            "queue_push failed [data: %s; data size: %zu, "
-                            "path size max: %zu]",
-                            data,
-                            data_size,
-                            get_conf()->path_max);
+                return 0;
+        }
+
+        if ( ( is_regular_file( fd ) > 0 )
+             && ( is_local_file( fd )   > 0 )
+             && ( path_stat.st_atime + EVICTION_TIMEOUT ) < time( NULL ) ) {
+
+                char *data = (char *)path;
+                size_t data_size = strlen( path ) + 1;
+
+                if ( queue_push( out_queue, data, data_size ) == -1 ) {
+                        LOG( ERROR,
+                             "queue_push failed [data: %s; data size: %zu, "
+                             "path size max: %zu]",
+                             data,
+                             data_size,
+                             get_conf()->path_max );
                         /* say that error happen, but do not abort execution */
                 }
+        }
+
+        if ( close( fd ) == -1 ) {
+                /* TODO: consider to handle EINTR */
         }
 
         return 0;

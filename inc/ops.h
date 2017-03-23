@@ -53,9 +53,9 @@ enum protocol_enum {
 
 typedef struct {
         enum protocol_enum protocol;
-        int    (*connect) ( void );
-        int    (*download)( const char *path, const char *object_id );
-        int    (*upload)  ( const char *path, const char *object_id );
+        int    (*connect)( void );
+        int    (*download)( int fd, const char *object_id );
+        int    (*upload)( int fd, const char *object_id );
         void   (*disconnect)( void );
         char  *(*get_xattr_value)( const char *path );
         size_t (*get_xattr_size) ( void );
@@ -63,16 +63,17 @@ typedef struct {
 
 ops_t  *get_ops();
 
-int    s3_connect(void);
-int    s3_download(const char *path, const char *object_id);
-int    s3_upload(const char *path, const char *object_id);
-void   s3_disconnect(void);
-char  *s3_get_xattr_value(const char *path);
-size_t s3_get_xattr_size(void);
+int    s3_connect( void );
+int    s3_download( int fd, const char *object_id );
+int    s3_upload( int fd, const char *object_id );
+void   s3_disconnect( void );
+char  *s3_get_xattr_value( const char *path );
+size_t s3_get_xattr_size( void );
 
-int download_file(const char *path);
-int upload_file(const char *path);
-int is_file_local(const char *path);
-int is_valid_path(const char *path);
+int download_file( const char *path );
+int upload_file( const char *path );
+int is_local_file( int fd );
+int is_remote_file( int fd );
+int is_regular_file( int fd );
 
 #endif    /* CLOUDTIERING_OPS_H */

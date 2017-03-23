@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <unistd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <attr/xattr.h>
@@ -318,7 +319,7 @@ static S3Status s3_get_object_data_callback(
  * @return  0: file's data has been successfully uploaded to s3 remote storage
  *         -1: error happen during process of upload of file's data
  */
-int s3_upload(const char *path, const char *object_id) {
+int s3_upload( int fd, const char *object_id ) {
         int retries = get_conf()->s3_operation_retries;
         int ret = 0; /* success by default */
         struct s3_put_object_callback_data put_object_data;
@@ -330,31 +331,52 @@ int s3_upload(const char *path, const char *object_id) {
                 .data = &put_object_data,
         };
 
-        /* stat structure for target file to get content length */
-        struct stat statbuf;
-        if (stat(path, &statbuf) == -1) {
+        /* duplicate file descriptor to be able to close file stream */
+        int dup_fd = dup( fd );
+        if ( dup_fd == -1 ) {
                 /* use thead safe version of strerror() */
-                if (strerror_r(errno, err_buf, ERR_MSG_BUF_LEN) == -1) {
+                if ( strerror_r( errno, err_buf, ERR_MSG_BUF_LEN ) == -1 ) {
                         err_buf[0] = '\0'; /* very unlikely */
                 }
 
-                LOG(ERROR, "failed to stat file %s: %s", path, err_buf);
+                LOG( ERROR,
+                     "[s3_upload] failed to dup() [ fd: %d | reason: %s ]",
+                     fd,
+                     err_buf );
+
+                return -1;
+        }
+
+        /* stat structure for target file to get content length */
+        struct stat statbuf;
+        if ( fstat( dup_fd , &statbuf ) == -1) {
+                /* use thead safe version of strerror() */
+                if ( strerror_r( errno, err_buf, ERR_MSG_BUF_LEN ) == -1 ) {
+                        err_buf[0] = '\0'; /* very unlikely */
+                }
+
+                LOG( ERROR,
+                     "[s3_upload] failed to fstat() file "
+                     "[ fd: %d | reason: %s ]",
+                     dup_fd,
+                     err_buf );
 
                 return -1;
         }
 
         /* initialize structure used during  */
         put_object_data.content_length = statbuf.st_size;
-        if (!(put_object_data.file = fopen(path, "r"))) {
+        if ( ! ( put_object_data.file = fdopen( dup_fd, "r" ) ) ) {
                 /* use thead safe version of strerror() */
-                if (strerror_r(errno, err_buf, ERR_MSG_BUF_LEN) == -1) {
+                if ( strerror_r( errno, err_buf, ERR_MSG_BUF_LEN ) == -1 ) {
                         err_buf[0] = '\0'; /* very unlikely */
                 }
 
-                LOG(ERROR,
-                    "failed to open file in 'r' mode [file: %s; reason: %s]",
-                    path,
-                    err_buf);
+                LOG( ERROR,
+                     "[s3_upload] failed to fdopen file in \"r\" mode "
+                     "[ fd: %d | reason: %s ]",
+                     dup_fd,
+                     err_buf );
 
                 return -1;
         }
@@ -365,33 +387,36 @@ int s3_upload(const char *path, const char *object_id) {
         };
 
         do {
-                S3_put_object(&g_bucket_context,
-                              object_id,
-                              put_object_data.content_length,
-                              NULL,
-                              NULL,
-                              &put_object_handler,
-                              &callback_data);
-        } while(S3_status_is_retryable(callback_data.status) && --retries);
+                S3_put_object( &g_bucket_context,
+                               object_id,
+                               put_object_data.content_length,
+                               NULL,
+                               NULL,
+                               &put_object_handler,
+                               &callback_data );
+        } while( S3_status_is_retryable( callback_data.status ) && --retries );
 
         /* fail on any error */
-        if (callback_data.status != S3StatusOK) {
-                LOG(ERROR,
-                    "S3_put_object() failed [error: %s]",
-                    S3_get_status_name(callback_data.status));
-                LOG(ERROR, callback_data.error_details);
+        if ( callback_data.status != S3StatusOK ) {
+                LOG( ERROR,
+                     "[s3_upload] S3_put_object() failed [ error: %s ]",
+                     S3_get_status_name( callback_data.status ) );
+                LOG( ERROR, callback_data.error_details );
                 ret = -1;
         }
 
-        if (fclose(put_object_data.file)) {
+        if ( fclose( put_object_data.file ) ) {
                 /* this is usually caused by very serious system error */
 
                 /* use thead safe version of strerror() */
-                if (strerror_r(errno, err_buf, ERR_MSG_BUF_LEN) == -1) {
+                if ( strerror_r( errno, err_buf, ERR_MSG_BUF_LEN ) == -1 ) {
                         err_buf[0] = '\0'; /* very unlikely */
                 }
 
-                LOG(ERROR, "failed to close file %s: %s", path, err_buf);
+                LOG( ERROR,
+                     "[s3_upload] failed to fclose file [fd: %d]",
+                     dup_fd,
+                     err_buf );
                 ret = -1;
         }
 
@@ -402,12 +427,12 @@ int s3_upload(const char *path, const char *object_id) {
  * @brief s3_download Downloads file's data from s3 remote storage
  *                    to local storage.
  *
- * @param[in] path Path to file whose data should be downloaded.
+ * @param[in] fd File descriptor of file whose data should be downloaded.
  *
  * @return  0: file's data has been successfully downloaded
  *         -1: error happen during file's data download
  */
-int s3_download(const char *path, const char *object_id) {
+int s3_download( int fd, const char *object_id ) {
         int retries = get_conf()->s3_operation_retries;
         int ret = 0; /* success by default */
         struct s3_get_object_callback_data get_object_data;
@@ -419,16 +444,32 @@ int s3_download(const char *path, const char *object_id) {
                 .data = &get_object_data,
         };
 
-        if (!(get_object_data.file = fopen(path, "w"))) {
+        /* duplicate file descriptor to be able to close file stream */
+        int dup_fd = dup( fd );
+        if ( dup_fd == -1 ) {
                 /* use thead safe version of strerror() */
-                if (strerror_r(errno, err_buf, ERR_MSG_BUF_LEN) == -1) {
+                if ( strerror_r( errno, err_buf, ERR_MSG_BUF_LEN ) == -1 ) {
                         err_buf[0] = '\0'; /* very unlikely */
                 }
 
-                LOG(ERROR,
-                    "failed to open file in 'w' mode [file: %s; reason: %s]",
-                    path,
-                    err_buf);
+                LOG( ERROR,
+                     "[s3_download] failed to dup(%d) [reason: %s]",
+                     fd,
+                     err_buf );
+
+                return -1;
+        }
+
+        if ( ( get_object_data.file = fdopen( dup_fd, "w" ) ) == NULL ) {
+                /* use thead safe version of strerror() */
+                if ( strerror_r( errno, err_buf, ERR_MSG_BUF_LEN ) == -1 ) {
+                        err_buf[0] = '\0'; /* very unlikely */
+                }
+
+                LOG( ERROR,
+                     "[s3_download] failed to fdopen(%d, \"w\") [reason: %s]",
+                     dup_fd,
+                     err_buf );
 
                 return -1;
         }
@@ -439,35 +480,38 @@ int s3_download(const char *path, const char *object_id) {
         };
 
         do {
-                S3_get_object(&g_bucket_context,
-                              object_id,
-                              NULL,
-                              0,
-                              0,
-                              NULL,
-                              &get_object_handler,
-                              &callback_data);
-        } while(S3_status_is_retryable(callback_data.status) && --retries);
+                S3_get_object( &g_bucket_context,
+                               object_id,
+                               NULL,
+                               0,
+                               0,
+                               NULL,
+                               &get_object_handler,
+                               &callback_data );
+        } while( S3_status_is_retryable( callback_data.status ) && --retries );
 
         /* fail on any error */
-        if (callback_data.status != S3StatusOK) {
-                LOG(ERROR,
-                    "S3_get_object() failed [error: %s]",
-                    S3_get_status_name(callback_data.status));
-                LOG(ERROR, callback_data.error_details);
+        if ( callback_data.status != S3StatusOK ) {
+                LOG( ERROR,
+                     "[s3_download] S3_get_object() failed [error: %s]",
+                     S3_get_status_name( callback_data.status ) );
+                LOG( ERROR, callback_data.error_details );
 
                 ret = -1;
         }
 
-        if (fclose(get_object_data.file)) {
+        if ( fclose( get_object_data.file ) ) {
                 /* this is usually caused by very serious system error */
 
                 /* use thead safe version of strerror() */
-                if (strerror_r(errno, err_buf, ERR_MSG_BUF_LEN) == -1) {
+                if ( strerror_r( errno, err_buf, ERR_MSG_BUF_LEN ) == -1 ) {
                         err_buf[0] = '\0'; /* very unlikely */
                 }
 
-                LOG(ERROR, "failed to close file %s: %s", path, err_buf);
+                LOG( ERROR,
+                     "[s3_download] failed to fclose() [fd: %d; reason: %s]",
+                     dup_fd,
+                     err_buf );
 
                 ret = -1;
         }

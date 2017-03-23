@@ -47,27 +47,27 @@ static const char *xattr_str[] = {
         XATTRS(XATTR_KEY, COMMA),
 };
 
-static int set_xattr( const char *path,
+static int set_xattr( int fd,
                       enum xattr_enum xattr,
                       void *value,
                       size_t value_size,
-                      int flags) {
+                      int flags ) {
 
-        if ( setxattr( path,
-                       xattr_str[xattr],
-                       value,
-                       value_size,
-                       flags ) == -1 ) {
+        if ( fsetxattr( fd,
+                        xattr_str[xattr],
+                        value,
+                        value_size,
+                        flags ) == -1 ) {
 
                 /* strerror_r() with very low probability can fail;
                  *          ignore such failures */
                 strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
 
                 LOG( ERROR,
-                     "failed to set extended attribute %s to file %s "
-                     "[reason: %s]",
+                     "failed to set extended attribute %s to file"
+                     "[fd: %d; reason: %s]",
                      xattr_str[e_locked],
-                     path,
+                     fd,
                      err_buf );
 
                 return -1;
@@ -76,12 +76,12 @@ static int set_xattr( const char *path,
         return 0;
 }
 
-static int get_xattr_tunable( const char *path,
+static int get_xattr_tunable( int fd,
                               enum xattr_enum xattr,
                               void  *value,
                               size_t value_size,
                               int ignore_enoattr ) {
-        if ( getxattr( path, xattr_str[xattr], value, value_size ) == -1 ) {
+        if ( fgetxattr( fd, xattr_str[xattr], value, value_size ) == -1 ) {
                 if ( ignore_enoattr && (errno == ENOATTR) ) {
                         return 1; /* no error, but value is special */
                 }
@@ -91,10 +91,10 @@ static int get_xattr_tunable( const char *path,
                 strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
 
                 LOG( ERROR,
-                     "failed to get extended attribute %s of file %s "
-                     "[reason: %s]",
+                     "failed to get extended attribute %s of file"
+                     "[fd: %d; reason: %s]",
                      xattr_str[xattr],
-                     path,
+                     fd,
                      err_buf );
 
                 return -1; /* error indication */
@@ -103,11 +103,11 @@ static int get_xattr_tunable( const char *path,
         return 0;
 }
 
-static int remove_xattr_tunable( const char *path,
+static int remove_xattr_tunable( int fd,
                                  enum xattr_enum xattr,
                                  int ignore_enoattr ) {
 
-        if ( removexattr( path, xattr_str[xattr] ) == -1 ) {
+        if ( fremovexattr( fd, xattr_str[xattr] ) == -1 ) {
                 if (  ignore_enoattr && ( errno == ENOATTR ) ) {
                         return 0;
                 }
@@ -117,10 +117,10 @@ static int remove_xattr_tunable( const char *path,
                 strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
 
                 LOG( ERROR,
-                     "failed to remove extended attribute %s of file %s "
-                     "[reason: %s]",
+                     "failed to remove extended attribute %s of file"
+                     "[fd: %d; reason: %s]",
                      xattr_str[xattr],
-                     path,
+                     fd,
                      err_buf );
 
                 return -1;
@@ -129,8 +129,8 @@ static int remove_xattr_tunable( const char *path,
         return 0;
 }
 
-static inline int remove_xattr( const char *path, enum xattr_enum xattr ) {
-        return remove_xattr_tunable( path, xattr, 0 );
+static inline int remove_xattr( int fd, enum xattr_enum xattr ) {
+        return remove_xattr_tunable( fd, xattr, 0 );
 }
 
 /**
@@ -139,17 +139,17 @@ static inline int remove_xattr( const char *path, enum xattr_enum xattr ) {
  * @note Operation is atomic according to
  *       http://man7.org/linux/man-pages/man7/xattr.7.html.
  *
- * @param[in] path Path of file to set lock.
+ * @param[in] fd File descriptor of file to set lock.
  *
  * @return  0: file was locked
  *         -1: file was not locked due to failure or lock was already set on
  *             this file previously
  */
-static int try_lock_file( const char *path ) {
-        if ( set_xattr( path, e_locked, NULL, 0, XATTR_CREATE ) == -1 ) {
+static int try_lock_file( int fd ) {
+        if ( set_xattr( fd, e_locked, NULL, 0, XATTR_CREATE ) == -1 ) {
                 /* lock file failures is normal, since another thread or
                    procces may already holding a lock */
-                LOG( DEBUG, "failed to lock file %s", path );
+                LOG( DEBUG, "failed to lock file [fd: %d]", fd );
                 return -1;
         }
 
@@ -162,16 +162,16 @@ static int try_lock_file( const char *path ) {
  * @note Operation is atomic according to
  *       http://man7.org/linux/man-pages/man7/xattr.7.html.
  *
- * @param[in] path Path of file to unset lock.
+ * @param[in] fd File descriptor of file to unset lock.
  *
  * @return  0: file was unlocked
  *         -1: file was not unlocked due to failure
  */
-static int unlock_file(const char *path) {
-        if ( remove_xattr(path, e_locked) == -1 ) {
+static int unlock_file( int fd ) {
+        if ( remove_xattr( fd, e_locked ) == -1 ) {
                 /* NOTE: impossible case in case program's logic is correct */
 
-                LOG( ERROR, "failed to unlock file %s", path );
+                LOG( ERROR, "failed to unlock file [fd: %d]", fd );
                 return -1;
         }
 
@@ -179,39 +179,59 @@ static int unlock_file(const char *path) {
 }
 
 /**
- * @brief is_file_local Check a location of file (local or remote).
+ * @brief is_local_file Check a location of file (local or remote).
  *
  * @note Operation is atomic according to
  *       http://man7.org/linux/man-pages/man7/xattr.7.html.
  *
- * @param[in] path Path to file to check location.
+ * @param[in] fd File descriptor of file to check location.
  *
  * @return  1: if file is in local storage
  *          0: if file is in remote storage
  *         -1: error happen during an attempt to get extended attribute's value
  */
-int is_file_local( const char *path ) {
+int is_local_file( int fd ) {
         /* in case stub attribute is not set returns 1,
            if set returns 0, on error returns -1 */
-        return get_xattr_tunable( path, e_stub, NULL, 0, 1 );
+        return get_xattr_tunable( fd, e_stub, NULL, 0, 1 );
 }
 
 /**
- * @brief is_valid_path Checks if path is valid, i.e. exists and
- *                      file is regular.
+ * @brief is_remote_file Check a location of file (local or remote).
  *
- * @param[in] path Path to file to validate.
+ * @note Operation is atomic according to
+ *       http://man7.org/linux/man-pages/man7/xattr.7.html.
  *
- * @return 1: if path is valid
- *         0: if path is not valid
+ * @param[in] fd File descriptor of file to check location.
+ *
+ * @return  1: if file is in remote storage
+ *          0: if file is in local storage
+ *         -1: error happen during an attempt to get extended attribute's value
  */
-int is_valid_path( const char *path ) {
+int is_remote_file( int fd ) {
+        /* in case stub attribute is not set returns 0,
+           if set returns 1, on error returns -1 */
+        int ret = is_local_file( fd );
+        return ( ret == -1 ) ? -1 : ( ! ret );
+}
+
+/**
+ * @brief is_regular_file Checks if path is valid, i.e. exists and
+ *                        file is regular.
+ *
+ * @param[in] fd File descriptor of file to validate.
+ *
+ * @return  1: if path is valid
+ *          0: if path is not valid
+ *         -1: error happen during fstat() call
+ */
+int is_regular_file( int fd ) {
         struct stat path_stat;
-        if ( (stat(path, &path_stat) == -1) || !S_ISREG(path_stat.st_mode) ) {
-                return 0; /* false */
+        if ( ( fstat( fd, &path_stat ) == -1 ) ) {
+                return -1;
         }
 
-        return 1; /* true */
+        return !! ( S_ISREG( path_stat.st_mode ) );
 }
 
 /**
@@ -224,26 +244,85 @@ int is_valid_path( const char *path ) {
  *             has happen during eviction
  */
 int upload_file( const char *path ) {
+        /* in order to prevent race conditions and slightly speed up execution
+           open the file once and then work with file descriptor */
+        int fd = open( path, O_RDWR );
+        if ( fd == -1 ) {
+                /* strerror_r() with very low probability can fail;
+                   ignore such failures */
+                strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
+
+                LOG( ERROR,
+                     "[upload_file] unable to open file "
+                     "[ path: %s | reason: %s ]",
+                     path,
+                     err_buf );
+
+                return -1;
+        } else {
+                LOG( DEBUG,
+                     "[upload_file] file opened successfully "
+                     "[ path: %s | fd: %d ]",
+                     path,
+                     fd );
+        }
+
         /* set lock to file to prevent other threads' and processes'
            access to file's data */
-        if ( try_lock_file( path ) == -1 ) {
+        if ( try_lock_file( fd ) == -1 ) {
                 LOG( DEBUG,
-                     "[upload_file] aborting file %s upload operation because "
-                     "it is locked by another thread or process",
-                     path );
+                     "[upload_file] aborting file upload operation because "
+                     "it is locked by another thread or process "
+                     "[ path: %s | fd: %d ]",
+                     path,
+                     fd );
+
+                if ( close( fd ) == -1 ) {
+                        /* TODO: consider to handle EINTR */
+
+                        /* strerror_r() with very low probability can fail;
+                           ignore such failures */
+                        strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
+
+                        LOG( ERROR,
+                             "[upload_file] failed to close file descriptor "
+                             "[ path: %s | fd: %d | reason: %s ]",
+                             path,
+                             fd,
+                             err_buf );
+                }
+
                 return -1;
         }
 
         /* check file's location */
-        if ( ! is_file_local(path) ) {
+        if ( ! is_local_file( fd ) ) {
                 LOG( DEBUG,
-                     "[upload_file] aborting file %s upload operation because "
-                     "it is already in the remote storage",
-                     path );
+                     "[upload_file] aborting file upload operation because "
+                     "it is already in the remote storage "
+                     "[ path: %s | fd: %d ]",
+                     path,
+                     fd );
 
                 /* NOTE: failues in the cleanup functions are impossible
                          as long as the program's logic is correct */
-                unlock_file( path );
+                unlock_file( fd );
+
+                if ( close( fd ) == -1 ) {
+                        /* TODO: consider to handle EINTR */
+
+                        /* strerror_r() with very low probability can fail;
+                           ignore such failures */
+                        strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
+
+                        LOG( ERROR,
+                             "[upload_file] failed to close file descriptor "
+                             "[ path: %s | fd: %d | reason: %s ]",
+                             path,
+                             fd,
+                             err_buf );
+                }
+
                 return 0;
         }
 
@@ -252,53 +331,106 @@ int upload_file( const char *path ) {
         size_t object_id_max_size = get_ops()->get_xattr_size();
 
         /* upload file's data to remote storage */
-        if ( get_ops()->upload( path, object_id ) == -1 ) {
+        if ( get_ops()->upload( fd, object_id ) == -1 ) {
                 LOG( ERROR,
-                     "[upload_file] aborting file %s upload operation because "
-                     "file's data upload failed",
-                     path );
+                     "[upload_file] aborting file upload operation because "
+                     "file's data upload failed [ path: %s | fd: %d ]",
+                     path,
+                     fd );
 
                 /* NOTE: failues in the cleanup functions are impossible
                          as long as the program's logic is correct */
-                unlock_file( path );
+                unlock_file( fd );
+
+                if ( close( fd ) == -1 ) {
+                        /* TODO: consider to handle EINTR */
+
+                        /* strerror_r() with very low probability can fail;
+                           ignore such failures */
+                        strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
+
+                        LOG( ERROR,
+                             "[upload_file] failed to close file descriptor "
+                             "[ path: %s | fd: %d | reason: %s ]",
+                             path,
+                             fd,
+                             err_buf );
+                }
+
                 return -1;
         }
 
         /* set object id to a corresponding attribute */
-        if ( set_xattr( path,
+        if ( set_xattr( fd,
                         e_object_id,
                         (void *)object_id,
                         object_id_max_size,
                         XATTR_CREATE ) == -1 ) {
                 LOG( ERROR,
-                     "[upload_file] aborting file %s upload operation because "
-                     "failed to set object identifier as a file's meta-data",
-                     path );
+                     "[upload_file] aborting file upload operation because "
+                     "failed to set object identifier as a file's meta-data"
+                     "[ path: %s | fd: %d ]",
+                     path,
+                     fd );
 
                 /* NOTE: failues in the cleanup functions are impossible
                          as long as the program's logic is correct */
-                unlock_file( path );
+                unlock_file( fd );
+
+                if ( close( fd ) == -1 ) {
+                        /* TODO: consider to handle EINTR */
+
+                        /* strerror_r() with very low probability can fail;
+                           ignore such failures */
+                        strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
+
+                        LOG( ERROR,
+                             "[upload_file] failed to close file descriptor "
+                             "[ path: %s | fd: %d | reason: %s ]",
+                             path,
+                             fd,
+                             err_buf );
+                }
+
                 return -1;
         }
 
         /* set file's location information */
-        if ( set_xattr( path, e_stub, NULL, 0, XATTR_CREATE ) == -1 ) {
+        if ( set_xattr( fd, e_stub, NULL, 0, XATTR_CREATE ) == -1 ) {
                 LOG( ERROR,
-                     "[upload_file] aborting file %s upload operation because "
-                     "failed to set location information as a file's meta-data",
-                     path );
+                     "[upload_file] aborting file upload operation because "
+                     "failed to set location information as a file's meta-data"
+                     "[ path: %s | fd: %d ]",
+                     path,
+                     fd );
 
                 /* NOTE: failues in the cleanup functions are impossible
                          as long as the program's logic is correct */
-                remove_xattr( path, e_object_id );
-                unlock_file( path );
+                remove_xattr( fd, e_object_id );
+                unlock_file( fd );
+
+                if ( close( fd ) == -1 ) {
+                        /* TODO: consider to handle EINTR */
+
+                        /* strerror_r() with very low probability can fail;
+                           ignore such failures */
+                        strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
+
+                        LOG( ERROR,
+                             "[upload_file] failed to close file descriptor "
+                             "[ path: %s | fd: %d | reason: %s ]",
+                             path,
+                             fd,
+                             err_buf );
+                }
+
                 return -1;
         }
 
         /* TODO: check that file still meets eviction requirements */
 
         /* truncate file */
-        if ( truncate( path, 0 ) == -1 ) {
+        if ( ftruncate( fd, 0 ) == -1 ) {
                 /* TODO: handle EINTR case */
 
                 /* strerror_r() with very low probability can fail;
@@ -306,23 +438,57 @@ int upload_file( const char *path ) {
                 strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
 
                 LOG( ERROR,
-                     "[upload_file] aborting file %s upload operation because "
-                     "failed to truncate this file [reason: %s]",
+                     "[upload_file] aborting file upload operation because "
+                     "failed to truncate this file "
+                     "[path: %s | fd: %s | reason: %s]",
                      path,
+                     fd,
                      err_buf );
 
                 /* NOTE: failues in the cleanup functions are impossible
                          as long as the program's logic is correct */
-                remove_xattr( path, e_object_id );
-                remove_xattr( path, e_stub );
-                unlock_file( path );
+                remove_xattr( fd, e_object_id );
+                remove_xattr( fd, e_stub );
+                unlock_file( fd );
+
+                if ( close( fd ) == -1 ) {
+                        /* TODO: consider to handle EINTR */
+
+                        /* strerror_r() with very low probability can fail;
+                           ignore such failures */
+                        strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
+
+                        LOG( ERROR,
+                             "[upload_file] failed to close file descriptor "
+                             "[ path: %s | fd: %d | reason: %s ]",
+                             path,
+                             fd,
+                             err_buf );
+                }
+
                 return -1;
         }
 
         /* all actions indended to file upload succeeded; just need to unlock */
         /* NOTE: failues in the cleanup functions are impossible
                  as long as the program's logic is correct */
-        unlock_file( path );
+        unlock_file( fd );
+
+        if ( close( fd ) == -1 ) {
+                /* TODO: consider to handle EINTR */
+
+                /* strerror_r() with very low probability can fail;
+                   ignore such failures */
+                strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
+
+                LOG( ERROR,
+                     "[upload_file] failed to close file descriptor "
+                     "[ path: %s | fd: %d | reason: %s ]",
+                     path,
+                     fd,
+                     err_buf );
+        }
+
         return 0;
 }
 
@@ -336,32 +502,87 @@ int upload_file( const char *path ) {
  *             file is currently being downloaded by another thread
  */
 int download_file( const char *path ) {
+        /* in order to prevent race conditions and slightly speed up execution
+           open the file once and then work with file descriptor */
+        int fd = open( path, O_RDWR );
+        if ( fd == -1 ) {
+                /* strerror_r() with very low probability can fail;
+                   ignore such failures */
+                strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
+
+                LOG( ERROR,
+                     "[download_file] unable to open file "
+                     "[ path: %s | reason: %s ]",
+                     path,
+                     err_buf );
+
+                return -1;
+        } else {
+                LOG( DEBUG,
+                     "[download_file] file %s opened with %d file descriptor",
+                     path,
+                     fd );
+        }
+
+
         /* set lock to file to prevent other threads' and processes'
            access to file */
-        if ( try_lock_file( path ) == -1 ) {
+        if ( try_lock_file( fd ) == -1 ) {
                 LOG( DEBUG,
                      "[download_file] aborting file %s download operation "
                      "because it is locked by another thread or process",
                      path );
+
+                if ( close( fd ) == -1 ) {
+                        /* TODO: consider to handle EINTR */
+
+                        /* strerror_r() with very low probability can fail;
+                           ignore such failures */
+                        strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
+
+                        LOG( ERROR,
+                             "[download_file] failed to close file descriptor "
+                             "[ path: %s | fd: %d | reason: %s ]",
+                             path,
+                             fd,
+                             err_buf );
+                }
+
                 return -1;
         }
 
         /* check file's location */
-        if ( is_file_local( path ) ) {
+        if ( is_local_file( fd ) ) {
                 LOG( DEBUG,
                      "[download_file] aborting file %s download operation "
                      "because it is already in the local storage",
                      path );
                 /* NOTE: failues in the cleanup functions are impossible
                          as long as the program's logic is correct */
-                unlock_file( path );
+                unlock_file( fd );
+
+                if ( close( fd ) == -1 ) {
+                        /* TODO: consider to handle EINTR */
+
+                        /* strerror_r() with very low probability can fail;
+                           ignore such failures */
+                        strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
+
+                        LOG( ERROR,
+                             "[download_file] failed to close file descriptor "
+                             "[ path: %s | fd: %d | reason: %s ]",
+                             path,
+                             fd,
+                             err_buf );
+                }
+
                 return 0;
         }
 
         size_t object_id_max_size = get_ops()->get_xattr_size();
         char object_id[object_id_max_size];
 
-        if ( get_xattr_tunable( path,
+        if ( get_xattr_tunable( fd,
                                 e_object_id,
                                 object_id,
                                 object_id_max_size,
@@ -372,12 +593,28 @@ int download_file( const char *path ) {
                      xattr_str[e_object_id],
                      path );
 
-                unlock_file( path );
+                unlock_file( fd );
+
+                if ( close( fd ) == -1 ) {
+                        /* TODO: consider to handle EINTR */
+
+                        /* strerror_r() with very low probability can fail;
+                           ignore such failures */
+                        strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
+
+                        LOG( ERROR,
+                             "[download_file] failed to close file descriptor "
+                             "[ path: %s | fd: %d | reason: %s ]",
+                             path,
+                             fd,
+                             err_buf );
+                }
+
                 return -1;
         }
 
         /* download file's data to local storage */
-        if ( get_ops()->download( path, object_id ) == -1 ) {
+        if ( get_ops()->download( fd, object_id ) == -1 ) {
                 LOG( ERROR,
                      "[download_file] aborting file %s download operation "
                      "because file's data download failed",
@@ -385,12 +622,28 @@ int download_file( const char *path ) {
 
                 /* NOTE: failues in the cleanup functions are impossible
                          as long as the program's logic is correct */
-                unlock_file( path );
+                unlock_file( fd );
+
+                if ( close( fd ) == -1 ) {
+                        /* TODO: consider to handle EINTR */
+
+                        /* strerror_r() with very low probability can fail;
+                           ignore such failures */
+                        strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
+
+                        LOG( ERROR,
+                             "[download_file] failed to close file descriptor "
+                             "[ path: %s | fd: %d | reason: %s ]",
+                             path,
+                             fd,
+                             err_buf );
+                }
+
                 return -1;
         }
 
         /* remove file's location information */
-        if ( remove_xattr( path, e_stub ) == -1 ) {
+        if ( remove_xattr( fd, e_stub ) == -1 ) {
                 /* NOTE: impossible case in case program's logic is correct */
 
                 LOG( ERROR,
@@ -400,11 +653,27 @@ int download_file( const char *path ) {
 
                 /* NOTE: failues in the cleanup functions are impossible
                          as long as the program's logic is correct */
-                unlock_file( path );
+                unlock_file( fd );
+
+                if ( close( fd ) == -1 ) {
+                        /* TODO: consider to handle EINTR */
+
+                        /* strerror_r() with very low probability can fail;
+                           ignore such failures */
+                        strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
+
+                        LOG( ERROR,
+                             "[download_file] failed to close file descriptor "
+                             "[ path: %s | fd: %d | reason: %s ]",
+                             path,
+                             fd,
+                             err_buf );
+                }
+
                 return -1;
         }
 
-        if ( remove_xattr( path, e_object_id ) == -1 ) {
+        if ( remove_xattr( fd, e_object_id ) == -1 ) {
                 /* NOTE: impossible case in case program's logic is correct */
 
                 LOG( ERROR,
@@ -415,13 +684,44 @@ int download_file( const char *path ) {
 
                 /* NOTE: failues in the cleanup functions are impossible
                          as long as the program's logic is correct */
-                unlock_file( path );
+                unlock_file( fd );
+
+                if ( close( fd ) == -1 ) {
+                        /* TODO: consider to handle EINTR */
+
+                        /* strerror_r() with very low probability can fail;
+                           ignore such failures */
+                        strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
+
+                        LOG( ERROR,
+                             "[download_file] failed to close file descriptor "
+                             "[ path: %s | fd: %d | reason: %s ]",
+                             path,
+                             fd,
+                             err_buf );
+                }
+
                 return -1;
         }
 
         /* NOTE: failues in the cleanup functions are impossible
                  as long as the program's logic is correct */
-        unlock_file( path );
+        unlock_file( fd );
+
+        if ( close( fd ) == -1 ) {
+                /* TODO: consider to handle EINTR */
+
+                /* strerror_r() with very low probability can fail;
+                   ignore such failures */
+                strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
+
+                LOG( ERROR,
+                     "[download_file] failed to close file descriptor "
+                     "[ path: %s | fd: %d | reason: %s ]",
+                     path,
+                     fd,
+                     err_buf );
+        }
 
         return 0;
 }
