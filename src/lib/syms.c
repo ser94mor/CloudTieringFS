@@ -67,25 +67,17 @@ void __attribute__ ((constructor)) init_syms(void) {
         /* we do not check the return result of dlsym() here because we do
            do not know what functions from this structure are actually needed
            by the program that uses this library; check for return result will
-           be performed in the places of actual invokation */
-        symbols.open       = dlsym( RTLD_NEXT, "open"       );
-        symbols.open64     = dlsym( RTLD_NEXT, "open64"     );
-        symbols.openat     = dlsym( RTLD_NEXT, "openat"     );
-        symbols.openat64   = dlsym( RTLD_NEXT, "openat64"   );
-        symbols.truncate   = dlsym( RTLD_NEXT, "truncate"   );
-        symbols.truncate64 = dlsym( RTLD_NEXT, "truncate64" );
-        symbols.stat       = dlsym( RTLD_NEXT, "stat"       );
-        symbols.stat64     = dlsym( RTLD_NEXT, "stat64"     );
-        symbols.fstatat    = dlsym( RTLD_NEXT, "fstatat"    );
-        symbols.fstatat64  = dlsym( RTLD_NEXT, "fstatat64"  );
-        symbols.futimesat  = dlsym( RTLD_NEXT, "futimesat"  );
-        symbols.utimes     = dlsym( RTLD_NEXT, "utimes"     );
-        symbols.utime      = dlsym( RTLD_NEXT, "utime"      );
-        symbols.fadvise    = dlsym( RTLD_NEXT, "fadvise"    );
-        symbols.fadvise64  = dlsym( RTLD_NEXT, "fadvise64"  );
+           be performed in the places of actual invocation */
+        symbols.open       = dlsym( RTLD_NEXT, "open"     );
+        symbols.openat     = dlsym( RTLD_NEXT, "openat"   );
 
-        symbols.fopen      = dlsym( RTLD_NEXT, "fopen"      );
-        symbols.freopen    = dlsym( RTLD_NEXT, "freopen"    );
+        symbols.truncate   = dlsym( RTLD_NEXT, "truncate" );
+
+        symbols.stat       = dlsym( RTLD_NEXT, "stat"     );
+        symbols.fstatat    = dlsym( RTLD_NEXT, "fstatat"  );
+
+        symbols.fopen      = dlsym( RTLD_NEXT, "fopen"    );
+        symbols.freopen    = dlsym( RTLD_NEXT, "freopen"  );
 }
 
 

@@ -107,10 +107,6 @@ int open( const char *path, int flags, ... ) {
         return finish_open_common( fd );
 }
 
-int creat( const char *path, mode_t mode ) {
-        return open( path, O_CREAT | O_WRONLY | O_TRUNC, mode );
-}
-
 int openat( int dir_fd, const char *path, int flags, ... ) {
         /* in case openat call was not initialized in the library constructor
            return ELIBACC; openat can not return such error in Linux
