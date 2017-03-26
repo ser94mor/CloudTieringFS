@@ -82,20 +82,29 @@ void __attribute__ ((constructor)) init_syms(void) {
 
 
 /**
- * @brief is_file_local Check a location of file (local or remote).
+ * @brief is_local_file Check a location of file by file descriptor
+ *                             (local or remote).
  *
  * @note Operation is atomic according to
  *       http://man7.org/linux/man-pages/man7/xattr.7.html.
  *
- * @param[in] fd File descriptor to check location.
+ * @param[in] fd   File descriptor to check location.
+ * @param[in] path Path to check location.
+ *
+ * @note Only one parameter will be used during location calculation
+ *       ( predicate: path == NULL )
  *
  * @return  1: if file is in local storage
  *          0: if file is in remote storage
  *         -1: error happen during an attempt to get extended attribute's value
  */
-int is_file_local( int fd ) {
+int is_local_file( int fd, const char *path ) {
 
-        if ( fgetxattr( fd, xattr_str[e_stub], NULL, 0 ) == -1 ) {
+        int ret = ( path == NULL )
+                  ? fgetxattr( fd,   xattr_str[e_stub], NULL, 0 )
+                  : getxattr(  path, xattr_str[e_stub], NULL, 0 );
+
+        if ( ret == -1 ) {
                 if (    ( errno == ENOATTR )
                      || ( errno == ENOTSUP )
                      || ( errno == ERANGE ) ) {
@@ -179,10 +188,10 @@ int schedule_download( int fd ) {
 
         char path[PROC_PID_FD_FD_PATH_MAX_LEN];
         snprintf(path,
-                PROC_PID_FD_FD_PATH_MAX_LEN,
-                PROC_PID_FD_FD_PATH_TEMPLATE,
-                (unsigned long long int)pid,
-                (unsigned long long int)fd);
+                 PROC_PID_FD_FD_PATH_MAX_LEN,
+                 PROC_PID_FD_FD_PATH_TEMPLATE,
+                 (unsigned long long int)pid,
+                 (unsigned long long int)fd);
 
         if ( queue_push( queue, path, PROC_PID_FD_FD_PATH_MAX_LEN ) == -1 ) {
                 /* this is very unlikely situation with blocking
@@ -194,13 +203,15 @@ int schedule_download( int fd ) {
         return 0;
 }
 
-int poll_file_location( int fd, int should_wait ) {
+int poll_file_location( int fd, const char *path, int should_wait ) {
         /* TODO: completely rewrite; current implementation do many kernel
-                 calls in the loop which is unacceptable */
+                 calls in the loop which is unacceptable; consider using
+                 signal SIGUSR1 or SIGUSR2 as a notification mechanism */
         int ret = -1;
 
         do {
-                ret = is_file_local( fd );
+                ret = ( path == NULL ) ? IS_LOCAL_FILE( fd )
+                                       : IS_LOCAL_FILE( path );
         } while ( ret == 0 );
 
         return ( ret == -1 ) ? -1 : 0;

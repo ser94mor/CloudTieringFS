@@ -256,6 +256,8 @@ int main(int argc, char *argv[]) {
                  times untouched */
         /* TODO: consider using S3 multipart upload and operations
                  on object parts as an optimization */
+        /* TODO: notify client process which enqueued file via signal
+                 SIGUSR1 or SIGUSR2 about the successful download event */
 
         pair_t dow_queue_pair;
         pair_t upl_queue_pair;

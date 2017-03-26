@@ -23,13 +23,27 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
+#include "defs.h"
 #include "syms.h"
 
-static inline int finish_open_common( int fd ) {
+static inline int finish_open_common( int fd, int flags ) {
         /* we are here when open() call succeeded (i. e. fd != -1);
            we should determine whether file local or remote and if remote,
            schedule its download in daemon */
-        int ret = is_file_local( fd );
+
+        /* with O_WRONLY we are not allowed to read values of extended
+           attributes, so we are compelled to use /proc file system */
+        int should_use_proc = ( ( flags & O_WRONLY ) == O_WRONLY );
+        char path[PROC_SELF_FD_FD_PATH_MAX_LEN];
+        if ( should_use_proc ) {
+                snprintf(path,
+                         PROC_SELF_FD_FD_PATH_MAX_LEN,
+                         PROC_SELF_FD_FD_PATH_TEMPLATE,
+                         (unsigned long long int)fd);
+        }
+
+        int ret = should_use_proc ? IS_LOCAL_FILE( path )
+                                  : IS_LOCAL_FILE( fd );
 
         /* handle the case when the file is local */
         if ( ret && ( ret != -1 ) ) {
@@ -44,7 +58,7 @@ static inline int finish_open_common( int fd ) {
                         return -1;
                 }
 
-                if ( poll_file_location( fd , 0 ) == -1 ) {
+                if ( poll_file_location( fd, path, 0 ) == -1 ) {
                         /* errno has been set inside that function */
                         return -1;
                 }
@@ -104,7 +118,7 @@ int open( const char *path, int flags, ... ) {
         }
 
         /* on errno will be set inside finish_open_common() */
-        return finish_open_common( fd );
+        return finish_open_common( fd, flags );
 }
 
 int openat( int dir_fd, const char *path, int flags, ... ) {
@@ -136,5 +150,5 @@ int openat( int dir_fd, const char *path, int flags, ... ) {
         }
 
         /* on errno will be set inside finish_open_common() */
-        return finish_open_common( fd );
+        return finish_open_common( fd, flags );
 }
