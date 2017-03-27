@@ -113,10 +113,27 @@
 #define XATTRS(action, sep)                                \
         action(stub)        sep \
         action(locked)      sep \
-        action(object_id)
+        action(object_id)   sep \
+        action(stat)
 
 /* a macro-function producing full name of extended attribute */
 #define XATTR_KEY(elem) \
         XATTR_NAMESPACE "." PROGRAM_NAME "." STRINGIFY(elem)
+
+#include <stdint.h>
+/* a subset of struct stat fields that will be stored in extended attributes;
+   using packed compiler attribute to ensure that we are saving metadata space;
+   according to
+       http://pubs.opengroup.org/onlinepubs/9699919799/basedefs/sys_types.h.html
+   off_t and blkcnt_t is of signed integer type, and since we may operate in
+   a distributed environment with different OSes and file systems configuration,
+   we want to use 64-bit signed integer types */
+typedef struct {
+        /* in stat structure it has off_t type */
+        int64_t st_size;
+
+        /* in stat structure it has blkcnt_t type */
+        int64_t st_blocks;
+} __attribute__ ((__packed__)) stat_t;
 
 #endif    /* CLOUDTIERING_DEFS_H */

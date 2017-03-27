@@ -29,22 +29,26 @@
    It is not presented in POSIX */
 
 typedef struct {
-    int (*open)( const char *path, int flags, ... );
-    int (*openat)(int dirfd, const char *path, int flags, ...);
+    int (*open)( const char *, int, ... );
+    int (*openat)( int, const char *, int, ... );
 
-    int (*truncate)(const char *path, off_t length);
+    int (*truncate)( const char *, off_t );
 
-    int (*stat)(const char *path, struct stat *buf);
-    int (*fstatat)(int fd, const char *path, struct stat *buf, int flag);
+    int (*stat)( const char *, struct stat * );
+    int (*lstat)( const char *, struct stat * );
+    /* we only use fstat function, not redefine it */
+    int (*fstat)( int, struct stat * );
+    int (*fstatat)( int, const char *, struct stat *, int );
 
 
-    FILE *(*fopen)(const char *path, const char *mode);                         // need to download file
-    FILE *(*freopen)(const char *path, const char *mode, FILE *stream);         // need to download file
+    FILE *(*fopen)( const char *, const char * );
+    FILE *(*freopen)( const char *, const char *, FILE * );
 } symbols_t;
 
 symbols_t *get_syms( void );
 
 int is_local_file( int fd, int flags );
+int has_stat_xattr( int fd );
 int schedule_download( int fd );
 int poll_file_location( int fd, int flags, int should_wait );
 
