@@ -29,6 +29,8 @@
 #include <attr/xattr.h>
 #include <sys/mman.h>
 #include <sys/types.h>
+#include <sys/ioctl.h>
+#include <linux/fs.h>
 
 #include "defs.h"
 #include "syms.h"
@@ -59,6 +61,13 @@ symbols_t *get_syms( void ) {
         return &symbols;
 }
 
+/* we use extended attribute to determite file's location; we use this
+   predicate several times in is_local_file function, so it make sence to
+   define it as macros */
+#define IS_LOCAL_PREDICATE    ( errno == ENOATTR )    \
+                              || ( errno == ENOTSUP ) \
+                              || ( errno == ERANGE )
+
 
 /* This function creates a table of pointers to glibc functions for all
  * of the io system calls so they can be called when needed
@@ -88,26 +97,22 @@ void __attribute__ ((constructor)) init_syms(void) {
  * @note Operation is atomic according to
  *       http://man7.org/linux/man-pages/man7/xattr.7.html.
  *
- * @param[in] fd   File descriptor to check location.
- * @param[in] path Path to check location.
- *
- * @note Only one parameter will be used during location calculation
- *       ( predicate: path == NULL )
+ * @param[in] fd    File descriptor to check location.
+ * @param[in] flags Flags with which file descriptor was opened.
  *
  * @return  1: if file is in local storage
  *          0: if file is in remote storage
  *         -1: error happen during an attempt to get extended attribute's value
  */
-int is_local_file( int fd, const char *path ) {
-
-        int ret = ( path == NULL )
-                  ? fgetxattr( fd,   xattr_str[e_stub], NULL, 0 )
-                  : getxattr(  path, xattr_str[e_stub], NULL, 0 );
+int is_local_file( int fd, int flags ) {
+        /* if file was opened in write-only mode, use fsetxattr with
+           XATTR_REPLACE which will produce result equivalent to fgetxattr */
+        int ret = ( ( flags & O_WRONLY ) == O_WRONLY )
+                  ? fsetxattr( fd, xattr_str[e_stub], NULL, 0, XATTR_REPLACE )
+                  : fgetxattr( fd, xattr_str[e_stub], NULL, 0 );
 
         if ( ret == -1 ) {
-                if (    ( errno == ENOATTR )
-                     || ( errno == ENOTSUP )
-                     || ( errno == ERANGE ) ) {
+                if ( IS_LOCAL_PREDICATE ) {
                         /* if ENOTSUP then the file not in our target filesystem
                            and we not manage lifecycle of this file,
                            if ERANGE then e_stub attribute should have
@@ -116,6 +121,36 @@ int is_local_file( int fd, const char *path ) {
                            definitely local by our convention which means that
                            we can safetly report that file is local */
                         return 1;
+                } else if ( errno == EPERM ) {
+                        /* only fsetxattr can produce this errno; we are here
+                           only in case linux-specific feature inode
+                           flags-attributes plays its role; more specifically
+                           either FS_APPEND_FL or FS_IMMUTABLE_FL flags
+                           are set (see setxattr(2) and ioctl_iflags(2));
+                           in many cases the current process can read the file
+                           either, so we want to get extended attribute using
+                           /proc/self/fd/<fd> file path and, is not works,
+                           give up and return error */
+                        char path[PROC_SELF_FD_FD_PATH_MAX_LEN];
+                        snprintf(path,
+                                 PROC_SELF_FD_FD_PATH_MAX_LEN,
+                                 PROC_SELF_FD_FD_PATH_TEMPLATE,
+                                 (unsigned long long int)fd);
+                        if ( getxattr( path, xattr_str[e_stub], NULL, 0) == -1 ) {
+                                if ( IS_LOCAL_PREDICATE ) {
+                                        /* as before, this conditional branch
+                                           indicates that file is local */
+                                        return 1;
+                                }
+
+                                /* we can do nothing here, return a error
+                                   produced by inner stat call */
+                                return -1;
+                        }
+
+                        /* e_stub atribute is set which means that file
+                           is remote */
+                        return 0;
                 } else {
                         /* errors from stat(2) which should be handled
                            separately in each public libc wrapper function
@@ -203,15 +238,14 @@ int schedule_download( int fd ) {
         return 0;
 }
 
-int poll_file_location( int fd, const char *path, int should_wait ) {
+int poll_file_location( int fd, int flags, int should_wait ) {
         /* TODO: completely rewrite; current implementation do many kernel
                  calls in the loop which is unacceptable; consider using
                  signal SIGUSR1 or SIGUSR2 as a notification mechanism */
         int ret = -1;
 
         do {
-                ret = ( path == NULL ) ? IS_LOCAL_FILE( fd )
-                                       : IS_LOCAL_FILE( path );
+                ret = is_local_file( fd, flags );
         } while ( ret == 0 );
 
         return ( ret == -1 ) ? -1 : 0;

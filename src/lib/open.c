@@ -31,19 +31,7 @@ static inline int finish_open_common( int fd, int flags ) {
            we should determine whether file local or remote and if remote,
            schedule its download in daemon */
 
-        /* with O_WRONLY we are not allowed to read values of extended
-           attributes, so we are compelled to use /proc file system */
-        int should_use_proc = ( ( flags & O_WRONLY ) == O_WRONLY );
-        char path[PROC_SELF_FD_FD_PATH_MAX_LEN];
-        if ( should_use_proc ) {
-                snprintf(path,
-                         PROC_SELF_FD_FD_PATH_MAX_LEN,
-                         PROC_SELF_FD_FD_PATH_TEMPLATE,
-                         (unsigned long long int)fd);
-        }
-
-        int ret = should_use_proc ? IS_LOCAL_FILE( path )
-                                  : IS_LOCAL_FILE( fd );
+        int ret = is_local_file( fd, flags );
 
         /* handle the case when the file is local */
         if ( ret && ( ret != -1 ) ) {
@@ -58,7 +46,7 @@ static inline int finish_open_common( int fd, int flags ) {
                         return -1;
                 }
 
-                if ( poll_file_location( fd, path, 0 ) == -1 ) {
+                if ( poll_file_location( fd, flags, 0 ) == -1 ) {
                         /* errno has been set inside that function */
                         return -1;
                 }
