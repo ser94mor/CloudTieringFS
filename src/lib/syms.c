@@ -129,7 +129,7 @@ int is_local_file( int fd, int flags ) {
                            are set (see setxattr(2) and ioctl_iflags(2));
                            in many cases the current process can read the file
                            either, so we want to get extended attribute using
-                           /proc/self/fd/<fd> file path and, is not works,
+                           /proc/self/fd/<fd> file path and, if not works,
                            give up and return error */
                         char path[PROC_SELF_FD_FD_PATH_MAX_LEN];
                         snprintf(path,
