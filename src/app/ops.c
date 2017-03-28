@@ -330,48 +330,6 @@ int upload_file( const char *path ) {
         const char *object_id     = get_ops()->get_xattr_value( path );
         size_t object_id_max_size = get_ops()->get_xattr_size();
 
-        /* get file size in bytes in order to set it to e_st_size
-           extended attribute */
-        struct stat stat_buf;
-        if ( fstat( fd , &stat_buf ) == -1) {
-                /* use thead safe version of strerror() */
-                if ( strerror_r( errno, err_buf, ERR_MSG_BUF_LEN ) == -1 ) {
-                        err_buf[0] = '\0'; /* very unlikely */
-                }
-
-                LOG( ERROR,
-                     "[upload_file] aborting file upload operation because "
-                     "failed to fstat() file "
-                     "[ fd: %d | reason: %s ]",
-                     fd,
-                     err_buf );
-
-                /* NOTE: failues in the cleanup functions are impossible
-                         as long as the program's logic is correct */
-                unlock_file( fd );
-
-                if ( close( fd ) == -1 ) {
-                        /* TODO: consider to handle EINTR */
-
-                        /* strerror_r() with very low probability can fail;
-                           ignore such failures */
-                        strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
-
-                        LOG( ERROR,
-                             "[upload_file] failed to close file descriptor "
-                             "[ path: %s | fd: %d | reason: %s ]",
-                             path,
-                             fd,
-                             err_buf );
-                }
-
-                return -1;
-        }
-        stat_t stat_xattr_val = {
-                .st_size   = (int64_t)stat_buf.st_size,
-                .st_blocks = (int64_t)stat_buf.st_blocks,
-        };
-
         /* upload file's data to remote storage */
         if ( get_ops()->upload( fd, object_id ) == -1 ) {
                 LOG( ERROR,
@@ -437,41 +395,6 @@ int upload_file( const char *path ) {
                 return -1;
         }
 
-        if ( set_xattr( fd,
-                        e_stat,
-                        &stat_xattr_val,
-                        sizeof( stat_t ),
-                        XATTR_CREATE ) == -1 ) {
-                LOG( ERROR,
-                     "[upload_file] aborting file upload operation because "
-                     "failed to set stat information as a file's meta-data"
-                     "[ path: %s | fd: %d ]",
-                     path,
-                     fd );
-
-                /* NOTE: failues in the cleanup functions are impossible
-                         as long as the program's logic is correct */
-                remove_xattr( fd, e_object_id );
-                unlock_file( fd );
-
-                if ( close( fd ) == -1 ) {
-                        /* TODO: consider to handle EINTR */
-
-                        /* strerror_r() with very low probability can fail;
-                           ignore such failures */
-                        strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
-
-                        LOG( ERROR,
-                             "[upload_file] failed to close file descriptor "
-                             "[ path: %s | fd: %d | reason: %s ]",
-                             path,
-                             fd,
-                             err_buf );
-                }
-
-                return -1;
-        }
-
         /* set file's location information */
         if ( set_xattr( fd, e_stub, NULL, 0, XATTR_CREATE ) == -1 ) {
                 LOG( ERROR,
@@ -483,7 +406,6 @@ int upload_file( const char *path ) {
 
                 /* NOTE: failues in the cleanup functions are impossible
                          as long as the program's logic is correct */
-                remove_xattr( fd, e_stat );
                 remove_xattr( fd, e_object_id );
                 unlock_file( fd );
 
@@ -506,8 +428,44 @@ int upload_file( const char *path ) {
         }
 
         /* TODO: check that file still meets eviction requirements */
+        /* get stat structure to determine the file size */
+        struct stat stat_buf;
+        if ( fstat( fd , &stat_buf ) == -1) {
+                /* use thead safe version of strerror() */
+                if ( strerror_r( errno, err_buf, ERR_MSG_BUF_LEN ) == -1 ) {
+                        err_buf[0] = '\0'; /* very unlikely */
+                }
 
-        /* truncate file */
+                LOG( ERROR,
+                     "[upload_file] aborting file upload operation because "
+                     "failed to fstat() file "
+                     "[ fd: %d | reason: %s ]",
+                     fd,
+                     err_buf );
+
+                /* NOTE: failues in the cleanup functions are impossible
+                         as long as the program's logic is correct */
+                unlock_file( fd );
+
+                if ( close( fd ) == -1 ) {
+                        /* TODO: consider to handle EINTR */
+
+                        /* strerror_r() with very low probability can fail;
+                           ignore such failures */
+                        strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
+
+                        LOG( ERROR,
+                             "[upload_file] failed to close file descriptor "
+                             "[ path: %s | fd: %d | reason: %s ]",
+                             path,
+                             fd,
+                             err_buf );
+                }
+
+                return -1;
+        }
+
+        /* truncate file to length 0 qq*/
         if ( ftruncate( fd, 0 ) == -1 ) {
                 /* TODO: handle EINTR case */
 
@@ -525,7 +483,52 @@ int upload_file( const char *path ) {
 
                 /* NOTE: failues in the cleanup functions are impossible
                          as long as the program's logic is correct */
-                remove_xattr( fd, e_stat );
+                remove_xattr( fd, e_object_id );
+                remove_xattr( fd, e_stub );
+                unlock_file( fd );
+
+                if ( close( fd ) == -1 ) {
+                        /* TODO: consider to handle EINTR */
+
+                        /* strerror_r() with very low probability can fail;
+                           ignore such failures */
+                        strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
+
+                        LOG( ERROR,
+                             "[upload_file] failed to close file descriptor "
+                             "[ path: %s | fd: %d | reason: %s ]",
+                             path,
+                             fd,
+                             err_buf );
+                }
+
+                return -1;
+        }
+
+        /* FIXME: here we have a risk that process that calls stat() from
+                  another process will get st_size == 0;
+                  on single-node file systems we can use fallocate() call with
+                  FALLOC_FL_PUNCH_HOLE mode to transform file to
+                  sparce via single system call */
+
+        /* make the file sparse by extending it to the original length */
+        if ( ftruncate( fd, stat_buf.st_size ) == -1 ) {
+                /* TODO: handle EINTR case */
+
+                /* strerror_r() with very low probability can fail;
+                   ignore such failures */
+                strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
+
+                LOG( ERROR,
+                     "[upload_file] aborting file upload operation because "
+                     "failed to truncate this file "
+                     "[path: %s | fd: %s | reason: %s]",
+                     path,
+                     fd,
+                     err_buf );
+
+                /* NOTE: failues in the cleanup functions are impossible
+                         as long as the program's logic is correct */
                 remove_xattr( fd, e_object_id );
                 remove_xattr( fd, e_stub );
                 unlock_file( fd );
@@ -723,37 +726,6 @@ int download_file( const char *path ) {
 
         /* FIXME: need to remove all extended attributes or repair attributes
                   that has already been removed */
-
-        /* remove file's stat information */
-        if ( remove_xattr( fd, e_stat ) == -1 ) {
-                /* NOTE: impossible case in case program's logic is correct */
-
-                LOG( ERROR,
-                     "[download_file] aborting file %s download operation "
-                     "because failed to remove stat file's meta-data",
-                     path );
-
-                /* NOTE: failues in the cleanup functions are impossible
-                         as long as the program's logic is correct */
-                unlock_file( fd );
-
-                if ( close( fd ) == -1 ) {
-                        /* TODO: consider to handle EINTR */
-
-                        /* strerror_r() with very low probability can fail;
-                           ignore such failures */
-                        strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
-
-                        LOG( ERROR,
-                             "[download_file] failed to close file descriptor "
-                             "[ path: %s | fd: %d | reason: %s ]",
-                             path,
-                             fd,
-                             err_buf );
-                }
-
-                return -1;
-        }
 
         /* remove file's location information */
         if ( remove_xattr( fd, e_stub ) == -1 ) {

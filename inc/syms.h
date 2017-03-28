@@ -34,13 +34,6 @@ typedef struct {
 
     int (*truncate)( const char *, off_t );
 
-    int (*stat)( const char *, struct stat * );
-    int (*lstat)( const char *, struct stat * );
-    /* we only use fstat function, not redefine it */
-    int (*fstat)( int, struct stat * );
-    int (*fstatat)( int, const char *, struct stat *, int );
-
-
     FILE *(*fopen)( const char *, const char * );
     FILE *(*freopen)( const char *, const char *, FILE * );
 } symbols_t;
@@ -48,7 +41,6 @@ typedef struct {
 symbols_t *get_syms( void );
 
 int is_local_file( int fd, int flags );
-int has_stat_xattr( int fd );
 int schedule_download( int fd );
 int poll_file_location( int fd, int flags, int should_wait );
 

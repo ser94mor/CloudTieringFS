@@ -82,11 +82,6 @@ void __attribute__ ((constructor)) init_syms(void) {
 
         symbols.truncate   = dlsym( RTLD_NEXT, "truncate" );
 
-        symbols.stat       = dlsym( RTLD_NEXT, "stat"     );
-        symbols.fstat      = dlsym( RTLD_NEXT, "fstat"    );
-        symbols.lstat      = dlsym( RTLD_NEXT, "lstat"    );
-        symbols.fstatat    = dlsym( RTLD_NEXT, "fstatat"  );
-
         symbols.fopen      = dlsym( RTLD_NEXT, "fopen"    );
         symbols.freopen    = dlsym( RTLD_NEXT, "freopen"  );
 }
@@ -163,11 +158,6 @@ int is_local_file( int fd, int flags ) {
 
         /* e_stub atribute is set which means that file is remote */
         return 0;
-}
-
-int has_stat_xattr( int fd ) {
-        /* TODO: implement this function */
-        return -1;
 }
 
 static void init_vars_once( void ) {
