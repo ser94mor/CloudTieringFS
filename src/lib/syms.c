@@ -160,6 +160,23 @@ int is_local_file( int fd, int flags ) {
         return 0;
 }
 
+int clear_xattrs( int fd ) {
+        int ret = 0;
+        /* e_locked, if currently set, will be removed by the daemon */
+
+        if (  ( fremovexattr( fd, xattr_str[e_stub] ) == -1 )
+           && ( errno != ENOATTR ) ) {
+                ret = -1;
+        }
+
+        if (  ( fremovexattr( fd, xattr_str[e_object_id] ) == -1 )
+           && ( errno != ENOATTR ) ) {
+                ret = -1;
+        }
+
+        return ret;
+}
+
 static void init_vars_once( void ) {
         /* set process' pid */
         pid = getpid();

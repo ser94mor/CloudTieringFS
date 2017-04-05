@@ -41,6 +41,7 @@ typedef struct {
 symbols_t *get_syms( void );
 
 int is_local_file( int fd, int flags );
+int clear_xattrs( int fd );
 int schedule_download( int fd );
 int poll_file_location( int fd, int flags, int should_wait );
 

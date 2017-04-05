@@ -20,6 +20,7 @@
 #include <stdarg.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 
@@ -41,6 +42,25 @@ static inline int finish_open_common( int fd, int flags ) {
 
         /* handle the case when the file is remote */
         if ( ret == 0 ) {
+                /* check O_TRUNC flag and avoid unnessesary download */
+                if ( ( ( flags & O_TRUNC ) == O_TRUNC ) ) {
+                        /* if O_TRUNC is used with flags other than O_RDWR
+                           and O_WRONLY then open() behaviour is unspecified
+                           (see open(2)) */
+
+                        /* NOTE: errors in clean_xattr, except ENOATTR are
+                                 impossible as long as the programs logic is
+                                 correct */
+                        if ( clear_xattrs( fd ) == -1 ) {
+                                /* can do nothing in case of failure */
+                                close( fd );
+                                errno = EIO;
+                                return -1;
+                        }
+
+                        return fd;
+                }
+
                 if ( schedule_download( fd ) == -1 ) {
                         /* errno has been set inside that function */
                         return -1;
