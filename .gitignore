@@ -2,3 +2,4 @@
 *.kdev4
 *.kate-swp
 bin/
+src/tst/pjd-fstest/fstest

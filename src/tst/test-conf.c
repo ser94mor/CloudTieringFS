@@ -24,22 +24,24 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#include "cloudtiering.h"
+#include "conf.h"
+#include "log.h"
 
 static const char *test_conf_str = \
         "<General>\n"                                       \
         "    FsMountPoint             /foo/bar\n"           \
         "    LoggingFramework         simple\n"             \
         "    RemoteStoreProtocol      s3\n"                 \
+        "    PathMax                  127\n"                \
         "</General>\n"                                      \
         "<Internal>\n"                                      \
-        "    ScanfsIterTimeoutSec     100\n"                \
-        "    ScanfsMaximumFailures    1\n"                  \
-        "    MoveFileMaximumFailures  2\n"                  \
-        "    MoveOutStartRate         0.8\n"                \
-        "    MoveOutStopRate          0.7\n"                \
-        "    OutQueueMaxSize          9999\n"               \
-        "    InQueueMaxSize           1111\n"               \
+        "    ScanfsIterTimeoutSec          100\n"           \
+        "    MoveOutStartRate              0.8\n"           \
+        "    MoveOutStopRate               0.7\n"           \
+        "    PrimaryDownloadQueueMaxSize   111\n"           \
+        "    SecondaryDownloadQueueMaxSize 222\n"           \
+        "    PrimaryUploadQueueMaxSize     333\n"           \
+        "    SecondaryUploadQueueMaxSize   444\n"           \
         "</Internal>\n"                                     \
         "<S3RemoteStore>\n"                                 \
         "    Hostname                 s3_hostname\n"        \
@@ -100,13 +102,14 @@ int test_conf(char *err_msg) {
             strcmp(conf->remote_store_protocol, "s3") ||
             strcmp(conf->transfer_protocol, "https") ||
             conf->scanfs_iter_tm_sec != 100 ||
-            conf->scanfs_max_fails != 1 ||
-            conf->move_file_max_fails != 2 ||
             conf->move_out_start_rate != 0.8 ||
             conf->move_out_stop_rate != 0.7 ||
-            conf->out_q_max_size != 9999 ||
-            conf->in_q_max_size != 1111 ||
+            conf->primary_download_queue_max_size != 111 ||
+            conf->secondary_download_queue_max_size != 222 ||
+            conf->primary_upload_queue_max_size != 333 ||
+            conf->secondary_upload_queue_max_size != 444 ||
             conf->s3_operation_retries != 5 ||
+            conf->path_max != (127 + 1) ||
             log->type != e_simple
         ) {
                 strcpy(err_msg, "configuration contains incorrect values");
