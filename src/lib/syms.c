@@ -160,6 +160,13 @@ int is_local_file( int fd, int flags ) {
         return 0;
 }
 
+/**
+ * @brief clear_xattrs Remove all known extended attributes except e_locked.
+ *
+ * @return  0: all known extended attributed were removed except e_locked
+ *         -1: error happen during known extended attributes removal
+ *             except e_locked; ENOATTR error is not an error and ignored
+ */
 int clear_xattrs( int fd ) {
         int ret = 0;
         /* e_locked, if currently set, will be removed by the daemon */
@@ -177,6 +184,10 @@ int clear_xattrs( int fd ) {
         return ret;
 }
 
+/**
+ * @brief init_vars_once Initialize library's global variables once, i.e.
+ *                       using pthread_once().
+ */
 static void init_vars_once( void ) {
         /* set process' pid */
         pid = getpid();
@@ -252,6 +263,11 @@ int schedule_download( int fd ) {
         return 0;
 }
 
+/**
+ * TODO: completely rewrite and rename; current implementation do many kernel
+ *       calls in the loop which is unacceptable; consider using
+ *       signal SIGUSR1 or SIGUSR2 as a notification mechanism.
+ */
 int poll_file_location( int fd, int flags, int should_wait ) {
         /* TODO: completely rewrite; current implementation do many kernel
                  calls in the loop which is unacceptable; consider using

@@ -28,18 +28,35 @@
 #include "policy.h"
 #include "ops.h"
 
+/* a helper structure that unites two arbitrary entities */
 typedef struct {
         void *first;
         void *second;
 } pair_t;
 
+/**
+ * TODO: implement thread monitoring
+ */
 static void monitor_threads(pthread_t *scan_fs_thread,
-                                      pthread_t *dowload_file_thread,
-                                      pthread_t *upload_file_thread) {
+                            pthread_t *dowload_file_thread,
+                            pthread_t *upload_file_thread) {
         /* TODO: implement thread monitoring */
         for(;;){}
 }
 
+/**
+ * @brief transfer_files_loop Common code for download_file_routine()
+ *                            and upload_file_routine() routines. Pops elements
+ *                            from the queues based on queue priority and
+ *                            performs requested action on the popped element.
+ *
+ * @note This function never returns.
+ *
+ * @param[in] pair        A pair of primary and secondary queues.
+ * @param[in] action      A pointer to the function to be invoked with popped
+ *                        element as an argument.
+ * @param[in] action_name Human-readable name of the action (for logging).
+ */
 static void *transfer_files_loop(pair_t *pair,
                                  int (*action)(const char *),
                                  const char *action_name) {
@@ -93,18 +110,41 @@ static void *transfer_files_loop(pair_t *pair,
         return "unreachable place";
 }
 
+/**
+ * @brief download_file_routine Routine responsible for scheduling and
+ *                              execution of download operations.
+ *
+ * @note This function never returns.
+ *
+ * @param[in] args A pair of primary and secondary dowload queues.
+ */
 static void *download_file_routine(void *args) {
         return transfer_files_loop((pair_t *)args,
                                    download_file,
                                    "download file");
 }
 
+/**
+ * @brief upload_file_routine Routine responsible for scheduling and
+ *                            execution of upload operations.
+ *
+ * @note This function never returns.
+ *
+ * @param[in] args A pair of primary and secondary upload queues.
+ */
 static void *upload_file_routine(void *args) {
         return transfer_files_loop((pair_t *)args,
                                    upload_file,
                                    "upload file");
 }
 
+/**
+ * @brief scan_fs_routine Routine responsible for file system scanning.
+ *
+ * @note This function never returns.
+ *
+ * @param[in] args A pair of upload and download queue pairs.
+ */
 static void *scan_fs_routine(void *args) {
         pair_t *dow_upl_pair = args;
         pair_t *dow_queue_pair = dow_upl_pair->first;
@@ -132,6 +172,18 @@ static void *scan_fs_routine(void *args) {
         return "unreachable place";
 }
 
+/**
+ * @brief init_data Initialization of global valuables and establishment of
+ *                  the connection to the remote storage.
+ *
+ * @param[out] dow_queue_pair A pair of primary and secondary download queues
+ *                            to be initialized.
+ * @param[out] upl_queue_pair A pair of primary and secondary upload queues
+ *                            to be initialized.
+ *
+ * @return  0: both data structures have successfully been initialized
+ *         -1: error happen during data structures initialization
+ */
 static int init_data(pair_t *dow_queue_pair,
                      pair_t *upl_queue_pair) {
         conf_t *conf = get_conf();
@@ -196,6 +248,21 @@ static int init_data(pair_t *dow_queue_pair,
         return 0;
 }
 
+/**
+ * @brief start_routines Start threads for (1) file system scanner,
+ *                       (2) download operations and (3) upload operations.
+ *
+ * @param[in] dow_queue_pair       A pair of primary and secondary
+ *                                 download queues.
+ * @param[in] upl_queue_pair       A pair of primary and secondary
+ *                                 upload queues.
+ * @param[in] scan_fs_thread       Thread id for file system scanner.
+ * @param[in] download_file_thread Thread id for download operations.
+ * @param[in] upload_file_thread   Thread id for upload operations.
+ *
+ * @return  0: when all threads have been successfully started
+ *         -1: when at least one thread was not started
+ */
 static int start_routines(pair_t    *dow_queue_pair,
                           pair_t    *upl_queue_pair,
                           pthread_t *scan_fs_thread,
@@ -249,6 +316,9 @@ static int start_routines(pair_t    *dow_queue_pair,
         return 0;
 }
 
+/**
+ * Entrypoint.
+ */
 int main(int argc, char *argv[]) {
         /* TODO: add check that extended attributes are supported */
         /* TODO: consider the increase of RLIMIT_NOFILE */
