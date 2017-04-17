@@ -1,4 +1,4 @@
-# cloudtiering Roadmap
+# Roadmap
 
 This is an overview of the planned features, impovements and bugs to be fixed.
 The below table is maintained and should reflect the current status of
