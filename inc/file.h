@@ -80,9 +80,9 @@ int is_remote_file_path( const char *path );
 int is_regular_file_path( const char *path );
 
 
-/*
- * File operations on a file descriptor.
- */
+/*******************************************************************************
+* FILE OPERATIONS ON A FILE DESCRIPTOR                                         *
+*******************************************************************************/
 
 /**
  * @brief is_local_file_fd Check a location of file (local or remote).
@@ -151,20 +151,58 @@ int try_lock_file( int fd );
  */
 int unlock_file( int fd );
 
-
-int remove_xattr( int fd, enum xattr_enum xattr );
+/**
+ * @brief set_xattr Set an extended attribute to file.
+ *
+ * @param[in] fd    File descriptor of file for extended attribute to be set.
+ * @param[in] xattr Extended attribute id from the list of known
+ *                  extended attributes.
+ * @param[in] value Buffer containing extended attribute's value.
+ * @param[in] size  Extended attribute's size.
+ * @param[in] flags Flags for fsetxattr(2) function.
+ *
+ * @return  0: extended attribute has successfully been set on file
+ *         -1: error has happened while setting extended attribute on file
+ */
 int set_xattr( int fd,
                enum xattr_enum xattr,
                void *value,
                size_t value_size,
                int flags );
+
+/**
+ * @brief get_xattr Get an extended attribute of file.
+ *
+ * @param[in] fd    File descriptor of file for extended attribute to be get.
+ * @param[in] xattr Extended attribute id from the list of known
+ *                  extended attributes.
+ * @param[in] value Buffer, large enough to store extended attribute's value.
+ * @param[in] size  Size of the value buffer.
+ *
+ * @return  0: extended attribute has successfully been get and stopred
+ *             in value buffer
+ *         -1: error has happened while getting an extended attribute of file
+ */
 int get_xattr( int fd,
                enum xattr_enum xattr,
                void  *value,
                size_t value_size );
 
+/**
+ * @brief remove_xattr Remove an extended attribute from file.
+ *
+ * @param[in] fd    File descriptor of file for extended attribute
+ *                  to be removed.
+ * @param[in] xattr Extended attribute id from the list of known
+ *                  extended attributes.
+ *
+ * @return  0: extended attribute has successfully been removed
+ *         -1: error has happened while removing an extended attribute from file
+ */
+int remove_xattr( int fd, enum xattr_enum xattr );
+
 /*
- * Convenient wrappers around path and fd similar functions.
+ * Convenient wrappers around similar functions with path and fd suffixes.
  */
 #define is_local_file(arg)                  \
         _Generic((arg),                     \

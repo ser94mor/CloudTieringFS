@@ -47,8 +47,8 @@ enum protocol_enum {
                 .download        = elem##_download,             \
                 .upload          = elem##_upload,               \
                 .disconnect      = elem##_disconnect,           \
-                .get_object_id_xattr_value = elem##_get_object_id_xattr_value,      \
-                .get_object_id_xattr_size  = elem##_get_object_id_xattr_size,       \
+                .get_object_id_xattr_value = elem##_get_object_id_xattr_value, \
+                .get_object_id_xattr_size  = elem##_get_object_id_xattr_size,  \
         }
 
 typedef struct {
