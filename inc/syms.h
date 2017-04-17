@@ -18,8 +18,6 @@
 #ifndef CLOUDTIERING_SYMS_H
 #define CLOUDTIERING_SYMS_H
 
-#define _GNU_SOURCE        /* needed for *64 symbols */
-
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>

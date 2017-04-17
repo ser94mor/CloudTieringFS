@@ -33,11 +33,7 @@
 
 #include "ops.h"
 #include "log.h"
-
-/* enum of supported extended attributes */
-enum xattr_enum {
-        XATTRS(ENUMERIZE, COMMA),
-};
+#include "file.h"
 
 /* buffer to store error messages (mostly errno messages) */
 static __thread char err_buf[ERR_MSG_BUF_LEN];
@@ -47,201 +43,9 @@ static const char *xattr_str[] = {
         XATTRS(XATTR_KEY, COMMA),
 };
 
-static int set_xattr( int fd,
-                      enum xattr_enum xattr,
-                      void *value,
-                      size_t value_size,
-                      int flags ) {
-
-        if ( fsetxattr( fd,
-                        xattr_str[xattr],
-                        value,
-                        value_size,
-                        flags ) == -1 ) {
-
-                /* strerror_r() with very low probability can fail;
-                 *          ignore such failures */
-                strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
-
-                LOG( ERROR,
-                     "failed to set extended attribute %s to file"
-                     "[fd: %d; reason: %s]",
-                     xattr_str[e_locked],
-                     fd,
-                     err_buf );
-
-                return -1;
-        }
-
-        return 0;
-}
-
-static int get_xattr_tunable( int fd,
-                              enum xattr_enum xattr,
-                              void  *value,
-                              size_t value_size,
-                              int ignore_enoattr ) {
-        if ( fgetxattr( fd, xattr_str[xattr], value, value_size ) == -1 ) {
-                if ( ignore_enoattr && (errno == ENOATTR) ) {
-                        return 1; /* no error, but value is special */
-                }
-
-                /* strerror_r() with very low probability can fail;
-                 *          ignore such failures */
-                strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
-
-                LOG( ERROR,
-                     "failed to get extended attribute %s of file"
-                     "[fd: %d; reason: %s]",
-                     xattr_str[xattr],
-                     fd,
-                     err_buf );
-
-                return -1; /* error indication */
-        }
-
-        return 0;
-}
-
-static int remove_xattr_tunable( int fd,
-                                 enum xattr_enum xattr,
-                                 int ignore_enoattr ) {
-
-        if ( fremovexattr( fd, xattr_str[xattr] ) == -1 ) {
-                if (  ignore_enoattr && ( errno == ENOATTR ) ) {
-                        return 0;
-                }
-
-                /* strerror_r() with very low probability can fail;
-                 *          ignore such failures */
-                strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
-
-                LOG( ERROR,
-                     "failed to remove extended attribute %s of file"
-                     "[fd: %d; reason: %s]",
-                     xattr_str[xattr],
-                     fd,
-                     err_buf );
-
-                return -1;
-        }
-
-        return 0;
-}
-
-static inline int remove_xattr( int fd, enum xattr_enum xattr ) {
-        return remove_xattr_tunable( fd, xattr, 0 );
-}
-
 /**
- * @brief try_lock_file Lock file using extended attribute as an indicator.
- *
- * @note Operation is atomic according to
- *       http://man7.org/linux/man-pages/man7/xattr.7.html.
- *
- * @param[in] fd File descriptor of file to set lock.
- *
- * @return  0: file was locked
- *         -1: file was not locked due to failure or lock was already set on
- *             this file previously
- */
-static int try_lock_file( int fd ) {
-        if ( set_xattr( fd, e_locked, NULL, 0, XATTR_CREATE ) == -1 ) {
-                /* lock file failures is normal, since another thread or
-                   procces may already holding a lock */
-                LOG( DEBUG, "failed to lock file [fd: %d]", fd );
-                return -1;
-        }
-
-        return 0;
-}
-
-/**
- * @brief unlock_file Unlock file via removal of extended attribute.
- *
- * @note Operation is atomic according to
- *       http://man7.org/linux/man-pages/man7/xattr.7.html.
- *
- * @param[in] fd File descriptor of file to unset lock.
- *
- * @return  0: file was unlocked
- *         -1: file was not unlocked due to failure
- */
-static int unlock_file( int fd ) {
-        if ( remove_xattr( fd, e_locked ) == -1 ) {
-                /* NOTE: impossible case in case program's logic is correct */
-
-                LOG( ERROR, "failed to unlock file [fd: %d]", fd );
-                return -1;
-        }
-
-        return 0;
-}
-
-/**
- * @brief is_local_file Check a location of file (local or remote).
- *
- * @note Operation is atomic according to
- *       http://man7.org/linux/man-pages/man7/xattr.7.html.
- *
- * @param[in] fd File descriptor of file to check location.
- *
- * @return  1: if file is in local storage
- *          0: if file is in remote storage
- *         -1: error happen during an attempt to get extended attribute's value
- */
-int is_local_file( int fd ) {
-        /* in case stub attribute is not set returns 1,
-           if set returns 0, on error returns -1 */
-        return get_xattr_tunable( fd, e_stub, NULL, 0, 1 );
-}
-
-/**
- * @brief is_remote_file Check a location of file (local or remote).
- *
- * @note Operation is atomic according to
- *       http://man7.org/linux/man-pages/man7/xattr.7.html.
- *
- * @param[in] fd File descriptor of file to check location.
- *
- * @return  1: if file is in remote storage
- *          0: if file is in local storage
- *         -1: error happen during an attempt to get extended attribute's value
- */
-int is_remote_file( int fd ) {
-        /* in case stub attribute is not set returns 0,
-           if set returns 1, on error returns -1 */
-        int ret = is_local_file( fd );
-        return ( ret == -1 ) ? -1 : ( ! ret );
-}
-
-/**
- * @brief is_regular_file Checks if path is valid, i.e. exists and
- *                        file is regular.
- *
- * @param[in] fd File descriptor of file to validate.
- *
- * @return  1: if path is valid
- *          0: if path is not valid
- *         -1: error happen during fstat() call
- */
-int is_regular_file( int fd ) {
-        struct stat path_stat;
-        if ( ( fstat( fd, &path_stat ) == -1 ) ) {
-                return -1;
-        }
-
-        return !! ( S_ISREG( path_stat.st_mode ) );
-}
-
-/**
- * @brief upload_file Upload file to remote storage from local storage.
- *
- * @param[in] path Path to a file to upload.
- *
- * @return  0: file has been upload to remote storage properly and truncated
- *         -1: file has not been upload due to error or access to file
- *             has happen during eviction
+ * Perform file upload operation from local storage to remote storage.
+ * See ops.h for complete description.
  */
 int upload_file( const char *path ) {
         /* in order to prevent race conditions and slightly speed up execution
@@ -327,8 +131,8 @@ int upload_file( const char *path ) {
         }
 
         /* calculate object id (the key) for the remote object storage */
-        const char *object_id     = get_ops()->get_xattr_value( path );
-        size_t object_id_max_size = get_ops()->get_xattr_size();
+        const char *object_id     = get_ops()->get_object_id_xattr_value( path );
+        size_t object_id_max_size = get_ops()->get_object_id_xattr_size();
 
         /* upload file's data to remote storage */
         if ( get_ops()->upload( fd, object_id ) == -1 ) {
@@ -575,13 +379,8 @@ int upload_file( const char *path ) {
 }
 
 /**
- * @brief dowload_file Download file from remote storage to local storage.
- *
- * @param[in] path Path to file to download.
- *
- * @return  0: file has been successfully dowloaded
- *         -1: failure happen due dowload of file or
- *             file is currently being downloaded by another thread
+ * Perform file download operation from remote storage to local storage.
+ * See ops.h for complete description.
  */
 int download_file( const char *path ) {
         /* in order to prevent race conditions and slightly speed up execution
@@ -661,14 +460,13 @@ int download_file( const char *path ) {
                 return 0;
         }
 
-        size_t object_id_max_size = get_ops()->get_xattr_size();
+        size_t object_id_max_size = get_ops()->get_object_id_xattr_size();
         char object_id[object_id_max_size];
 
-        if ( get_xattr_tunable( fd,
-                                e_object_id,
-                                object_id,
-                                object_id_max_size,
-                                0 ) == -1 ) {
+        if ( get_xattr( fd,
+                        e_object_id,
+                        object_id,
+                        object_id_max_size ) == -1 ) {
                 LOG( ERROR,
                      "[download_file] aborting file %s download operation "
                      "because failed to obtain value of %s extended attribute",

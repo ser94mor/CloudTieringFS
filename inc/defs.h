@@ -110,7 +110,7 @@
 #define PROC_SELF_FD_FD_PATH_MAX_LEN        ( 14 + 20 + 1 )
 
 /* a list of all possible extended attributes */
-#define XATTRS(action, sep)                                \
+#define XATTRS(action, sep)     \
         action(stub)        sep \
         action(locked)      sep \
         action(object_id)

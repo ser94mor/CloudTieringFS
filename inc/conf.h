@@ -53,13 +53,20 @@ enum section_enum {
 /* TODO: this massive struct is legacy and
          should be devided to smaller units */
 typedef struct {
-        /* 4096 is minimum acceptable value (including null) according to POSIX (equals PATH_MAX from linux/limits.h) */
-        char   fs_mount_point[4096];          /* filesystem's root directory */
+        /* 4096 is minimum acceptable value (including null) according
+           to POSIX (equals PATH_MAX from linux/limits.h);
+           filesystem's root directory */
+        char   fs_mount_point[4096];
 
-        time_t scanfs_iter_tm_sec;            /* the lowest time interval between file system scan iterations */
+        /* the lowest time interval between file system scan iterations */
+        time_t scanfs_iter_tm_sec;
 
-        double move_out_start_rate;           /* start evicting files when storage is (move_out_start_rate * 100)% full */
-        double move_out_stop_rate;            /* stop evicting files when storage is (move_out_stop_rate * 100)% full */
+        /* start evicting files when storage is
+           move_out_start_rate * 100)% full */
+        double move_out_start_rate;
+        /* stop evicting files when storage is (move_out_stop_rate * 100)%
+           full */
+        double move_out_stop_rate;
 
         size_t primary_download_queue_max_size;
         size_t secondary_download_queue_max_size;
@@ -67,7 +74,9 @@ typedef struct {
         size_t primary_upload_queue_max_size;
         size_t secondary_upload_queue_max_size;
 
-        size_t path_max;                      /* maximum path length in fs_mount_point directory can not be lower than this value */
+        /* maximum path length in fs_mount_point directory can not be lower
+           than this value */
+        size_t path_max;
 
         /* 63 it is unlikely that protocol identifies require more symbols */
         char   remote_store_protocol[64];
@@ -75,17 +84,23 @@ typedef struct {
         /* 15 enough to store string id of transfer protocol */
         char transfer_protocol[16];
 
-        /* 255 equals to S3_MAX_HOSTNAME_SIZE from libs3 */
-        char   s3_default_hostname[256];      /* s3 default hostname (libs3) */
+        /* 255 equals to S3_MAX_HOSTNAME_SIZE from libs3;
+           s3 default hostname (libs3) */
+        char   s3_default_hostname[256];
 
-        /* 63 is maximum allowed bucket name according to http://docs.aws.amazon.com/AmazonS3/latest/dev/BucketRestrictions.html */
-        char   s3_bucket[64];                 /* name of s3 bucket which will be used as a remote tier */
+        /* 63 is maximum allowed bucket name according to
+         http://docs.aws.amazon.com/AmazonS3/latest/dev/BucketRestrictions.html;
+         name of s3 bucket which will be used as a remote tier */
+        char   s3_bucket[64];
 
-        /* 32 is maximum access key id length according to http://docs.aws.amazon.com/IAM/latest/APIReference/API_AccessKey.html */
-        char   s3_access_key_id[33];          /* s3 access key id */
+        /* 32 is maximum access key id length according to
+          http://docs.aws.amazon.com/IAM/latest/APIReference/API_AccessKey.html;
+          s3 access key id */
+        char   s3_access_key_id[33];
 
-        /* 127 is an assumption that in practice longer keys do not exist */
-        char   s3_secret_access_key[128];     /* s3 secret access key */
+        /* 127 is an assumption that in practice longer keys do not exist;
+           s3 secret access key */
+        char   s3_secret_access_key[128];
 
         /* maximum number of retries of s3 requests */
         int s3_operation_retries;

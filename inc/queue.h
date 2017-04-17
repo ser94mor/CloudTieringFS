@@ -74,7 +74,7 @@ typedef struct {
         size_t buf_size;
 
         /* a string storing name of shared memory object
-          where this queue resides */
+           where this queue resides */
         char shm_obj[NAME_MAX + 1];
 
         /* a total size in bytes of the shared memory object
