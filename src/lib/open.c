@@ -27,6 +27,9 @@
 #include "defs.h"
 #include "syms.h"
 
+/**
+ * Common part for open(2) and openat(2) system call redefinitions.
+ */
 static inline int finish_open_common( int fd, int flags ) {
         /* we are here when open() call succeeded (i. e. fd != -1);
            we should determine whether file local or remote and if remote,
@@ -97,6 +100,9 @@ static inline int finish_open_common( int fd, int flags ) {
         return -1;
 }
 
+/**
+ * Redefinition of open(2) system call.
+ */
 int open( const char *path, int flags, ... ) {
         /* in case openat call was not initialized in the library constructor
            return ELIBACC; open can not return such error in Linux
@@ -129,6 +135,9 @@ int open( const char *path, int flags, ... ) {
         return finish_open_common( fd, flags );
 }
 
+/**
+ * Redefinition of openat(2) system call.
+ */
 int openat( int dir_fd, const char *path, int flags, ... ) {
         /* in case openat call was not initialized in the library constructor
            return ELIBACC; openat can not return such error in Linux

@@ -299,6 +299,9 @@ static int s3_put_object_data_callback(
         return ret;
 }
 
+/**
+ * TODO: write description.
+ */
 static S3Status s3_get_object_data_callback(
         int buffer_size, const char *buffer, void *callback_data) {
         struct s3_get_object_callback_data *data =
@@ -594,6 +597,9 @@ void s3_disconnect(void) {
         S3_deinitialize();
 }
 
+/**
+ * TODO: write description.
+ */
 char *s3_get_object_id_xattr_value(const char *path) {
         /* TODO: implement this function later using near-perfect hash function
                  to compress long paths to keys no more then
@@ -613,6 +619,9 @@ char *s3_get_object_id_xattr_value(const char *path) {
         return s3_xattr_buf;
 }
 
+/**
+ * TODO: write description.
+ */
 size_t s3_get_object_id_xattr_size(void) {
         return S3_XATTR_SIZE;
 }
