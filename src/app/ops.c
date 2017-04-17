@@ -44,6 +44,33 @@ static const char *xattr_str[] = {
 };
 
 /**
+ * @brief close_handle_err Close file descriptor and handle errors, if any.
+ *
+ * @param[in] fd        File descriptor to be closed.
+ * @param[in] path      Path to the file which file descriptor should be closed.
+ * @param[in] func_name Name of the function which called this close wrapper.
+ */
+static void close_handle_err( int fd,
+                              const char *path,
+                              const char *func_name ) {
+        if ( close( fd ) == -1 ) {
+                /* TODO: consider to handle EINTR */
+
+                /* strerror_r() with very low probability can fail;
+                   ignore such failures */
+                strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
+
+                LOG( ERROR,
+                     "[%s] failed to close file descriptor "
+                     "[ path: %s | fd: %d | reason: %s ]",
+                     func_name,
+                     path,
+                     fd,
+                     err_buf );
+        }
+}
+
+/**
  * Perform file upload operation from local storage to remote storage.
  * See ops.h for complete description.
  */
@@ -81,20 +108,7 @@ int upload_file( const char *path ) {
                      path,
                      fd );
 
-                if ( close( fd ) == -1 ) {
-                        /* TODO: consider to handle EINTR */
-
-                        /* strerror_r() with very low probability can fail;
-                           ignore such failures */
-                        strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
-
-                        LOG( ERROR,
-                             "[upload_file] failed to close file descriptor "
-                             "[ path: %s | fd: %d | reason: %s ]",
-                             path,
-                             fd,
-                             err_buf );
-                }
+                close_handle_err( fd, path, "upload_file" );
 
                 return -1;
         }
@@ -112,20 +126,7 @@ int upload_file( const char *path ) {
                          as long as the program's logic is correct */
                 unlock_file( fd );
 
-                if ( close( fd ) == -1 ) {
-                        /* TODO: consider to handle EINTR */
-
-                        /* strerror_r() with very low probability can fail;
-                           ignore such failures */
-                        strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
-
-                        LOG( ERROR,
-                             "[upload_file] failed to close file descriptor "
-                             "[ path: %s | fd: %d | reason: %s ]",
-                             path,
-                             fd,
-                             err_buf );
-                }
+                close_handle_err( fd, path, "upload_file" );
 
                 return 0;
         }
@@ -146,20 +147,7 @@ int upload_file( const char *path ) {
                          as long as the program's logic is correct */
                 unlock_file( fd );
 
-                if ( close( fd ) == -1 ) {
-                        /* TODO: consider to handle EINTR */
-
-                        /* strerror_r() with very low probability can fail;
-                           ignore such failures */
-                        strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
-
-                        LOG( ERROR,
-                             "[upload_file] failed to close file descriptor "
-                             "[ path: %s | fd: %d | reason: %s ]",
-                             path,
-                             fd,
-                             err_buf );
-                }
+                close_handle_err( fd, path, "upload_file" );
 
                 return -1;
         }
@@ -181,20 +169,7 @@ int upload_file( const char *path ) {
                          as long as the program's logic is correct */
                 unlock_file( fd );
 
-                if ( close( fd ) == -1 ) {
-                        /* TODO: consider to handle EINTR */
-
-                        /* strerror_r() with very low probability can fail;
-                           ignore such failures */
-                        strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
-
-                        LOG( ERROR,
-                             "[upload_file] failed to close file descriptor "
-                             "[ path: %s | fd: %d | reason: %s ]",
-                             path,
-                             fd,
-                             err_buf );
-                }
+                close_handle_err( fd, path, "upload_file" );
 
                 return -1;
         }
@@ -213,20 +188,7 @@ int upload_file( const char *path ) {
                 remove_xattr( fd, e_object_id );
                 unlock_file( fd );
 
-                if ( close( fd ) == -1 ) {
-                        /* TODO: consider to handle EINTR */
-
-                        /* strerror_r() with very low probability can fail;
-                           ignore such failures */
-                        strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
-
-                        LOG( ERROR,
-                             "[upload_file] failed to close file descriptor "
-                             "[ path: %s | fd: %d | reason: %s ]",
-                             path,
-                             fd,
-                             err_buf );
-                }
+                close_handle_err( fd, path, "upload_file" );
 
                 return -1;
         }
@@ -251,20 +213,7 @@ int upload_file( const char *path ) {
                          as long as the program's logic is correct */
                 unlock_file( fd );
 
-                if ( close( fd ) == -1 ) {
-                        /* TODO: consider to handle EINTR */
-
-                        /* strerror_r() with very low probability can fail;
-                           ignore such failures */
-                        strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
-
-                        LOG( ERROR,
-                             "[upload_file] failed to close file descriptor "
-                             "[ path: %s | fd: %d | reason: %s ]",
-                             path,
-                             fd,
-                             err_buf );
-                }
+                close_handle_err( fd, path, "upload_file" );
 
                 return -1;
         }
@@ -291,20 +240,7 @@ int upload_file( const char *path ) {
                 remove_xattr( fd, e_stub );
                 unlock_file( fd );
 
-                if ( close( fd ) == -1 ) {
-                        /* TODO: consider to handle EINTR */
-
-                        /* strerror_r() with very low probability can fail;
-                           ignore such failures */
-                        strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
-
-                        LOG( ERROR,
-                             "[upload_file] failed to close file descriptor "
-                             "[ path: %s | fd: %d | reason: %s ]",
-                             path,
-                             fd,
-                             err_buf );
-                }
+                close_handle_err( fd, path, "upload_file" );
 
                 return -1;
         }
@@ -337,20 +273,7 @@ int upload_file( const char *path ) {
                 remove_xattr( fd, e_stub );
                 unlock_file( fd );
 
-                if ( close( fd ) == -1 ) {
-                        /* TODO: consider to handle EINTR */
-
-                        /* strerror_r() with very low probability can fail;
-                           ignore such failures */
-                        strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
-
-                        LOG( ERROR,
-                             "[upload_file] failed to close file descriptor "
-                             "[ path: %s | fd: %d | reason: %s ]",
-                             path,
-                             fd,
-                             err_buf );
-                }
+                close_handle_err( fd, path, "upload_file" );
 
                 return -1;
         }
@@ -360,20 +283,7 @@ int upload_file( const char *path ) {
                  as long as the program's logic is correct */
         unlock_file( fd );
 
-        if ( close( fd ) == -1 ) {
-                /* TODO: consider to handle EINTR */
-
-                /* strerror_r() with very low probability can fail;
-                   ignore such failures */
-                strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
-
-                LOG( ERROR,
-                     "[upload_file] failed to close file descriptor "
-                     "[ path: %s | fd: %d | reason: %s ]",
-                     path,
-                     fd,
-                     err_buf );
-        }
+        close_handle_err( fd, path, "upload_file" );
 
         return 0;
 }
@@ -414,20 +324,7 @@ int download_file( const char *path ) {
                      "because it is locked by another thread or process",
                      path );
 
-                if ( close( fd ) == -1 ) {
-                        /* TODO: consider to handle EINTR */
-
-                        /* strerror_r() with very low probability can fail;
-                           ignore such failures */
-                        strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
-
-                        LOG( ERROR,
-                             "[download_file] failed to close file descriptor "
-                             "[ path: %s | fd: %d | reason: %s ]",
-                             path,
-                             fd,
-                             err_buf );
-                }
+                close_handle_err( fd, path, "download_file" );
 
                 return -1;
         }
@@ -442,20 +339,7 @@ int download_file( const char *path ) {
                          as long as the program's logic is correct */
                 unlock_file( fd );
 
-                if ( close( fd ) == -1 ) {
-                        /* TODO: consider to handle EINTR */
-
-                        /* strerror_r() with very low probability can fail;
-                           ignore such failures */
-                        strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
-
-                        LOG( ERROR,
-                             "[download_file] failed to close file descriptor "
-                             "[ path: %s | fd: %d | reason: %s ]",
-                             path,
-                             fd,
-                             err_buf );
-                }
+                close_handle_err( fd, path, "download_file" );
 
                 return 0;
         }
@@ -475,20 +359,7 @@ int download_file( const char *path ) {
 
                 unlock_file( fd );
 
-                if ( close( fd ) == -1 ) {
-                        /* TODO: consider to handle EINTR */
-
-                        /* strerror_r() with very low probability can fail;
-                           ignore such failures */
-                        strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
-
-                        LOG( ERROR,
-                             "[download_file] failed to close file descriptor "
-                             "[ path: %s | fd: %d | reason: %s ]",
-                             path,
-                             fd,
-                             err_buf );
-                }
+                close_handle_err( fd, path, "download_file" );
 
                 return -1;
         }
@@ -504,20 +375,7 @@ int download_file( const char *path ) {
                          as long as the program's logic is correct */
                 unlock_file( fd );
 
-                if ( close( fd ) == -1 ) {
-                        /* TODO: consider to handle EINTR */
-
-                        /* strerror_r() with very low probability can fail;
-                           ignore such failures */
-                        strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
-
-                        LOG( ERROR,
-                             "[download_file] failed to close file descriptor "
-                             "[ path: %s | fd: %d | reason: %s ]",
-                             path,
-                             fd,
-                             err_buf );
-                }
+                close_handle_err( fd, path, "download_file" );
 
                 return -1;
         }
@@ -538,20 +396,7 @@ int download_file( const char *path ) {
                          as long as the program's logic is correct */
                 unlock_file( fd );
 
-                if ( close( fd ) == -1 ) {
-                        /* TODO: consider to handle EINTR */
-
-                        /* strerror_r() with very low probability can fail;
-                           ignore such failures */
-                        strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
-
-                        LOG( ERROR,
-                             "[download_file] failed to close file descriptor "
-                             "[ path: %s | fd: %d | reason: %s ]",
-                             path,
-                             fd,
-                             err_buf );
-                }
+                close_handle_err( fd, path, "download_file" );
 
                 return -1;
         }
@@ -569,20 +414,7 @@ int download_file( const char *path ) {
                          as long as the program's logic is correct */
                 unlock_file( fd );
 
-                if ( close( fd ) == -1 ) {
-                        /* TODO: consider to handle EINTR */
-
-                        /* strerror_r() with very low probability can fail;
-                           ignore such failures */
-                        strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
-
-                        LOG( ERROR,
-                             "[download_file] failed to close file descriptor "
-                             "[ path: %s | fd: %d | reason: %s ]",
-                             path,
-                             fd,
-                             err_buf );
-                }
+                close_handle_err( fd, path, "download_file" );
 
                 return -1;
         }
@@ -591,20 +423,7 @@ int download_file( const char *path ) {
                  as long as the program's logic is correct */
         unlock_file( fd );
 
-        if ( close( fd ) == -1 ) {
-                /* TODO: consider to handle EINTR */
-
-                /* strerror_r() with very low probability can fail;
-                   ignore such failures */
-                strerror_r( errno, err_buf, ERR_MSG_BUF_LEN );
-
-                LOG( ERROR,
-                     "[download_file] failed to close file descriptor "
-                     "[ path: %s | fd: %d | reason: %s ]",
-                     path,
-                     fd,
-                     err_buf );
-        }
+        close_handle_err( fd, path, "download_file" );
 
         return 0;
 }
