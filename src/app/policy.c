@@ -31,6 +31,7 @@
 #include "ops.h"
 #include "conf.h"
 #include "queue.h"
+#include "file.h"
 
 /*******************
  * Scan filesystem *

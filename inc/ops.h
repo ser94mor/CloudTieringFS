@@ -47,33 +47,70 @@ enum protocol_enum {
                 .download        = elem##_download,             \
                 .upload          = elem##_upload,               \
                 .disconnect      = elem##_disconnect,           \
-                .get_xattr_value = elem##_get_xattr_value,      \
-                .get_xattr_size  = elem##_get_xattr_size,       \
+                .get_object_id_xattr_value = elem##_get_object_id_xattr_value,      \
+                .get_object_id_xattr_size  = elem##_get_object_id_xattr_size,       \
         }
 
 typedef struct {
+        /* protocol identifier */
         enum protocol_enum protocol;
+
+        /* this function will be called to establish connection
+           to remote storage */
         int    (*connect)( void );
+
+        /* this function will be called to perform file download operation */
         int    (*download)( int fd, const char *object_id );
+
+        /* this function will be called to perform file upload operation */
         int    (*upload)( int fd, const char *object_id );
+
+        /* this function will be called to gracefully disconnect from
+           the remote storage */
         void   (*disconnect)( void );
-        char  *(*get_xattr_value)( const char *path );
-        size_t (*get_xattr_size) ( void );
+
+        /* get value of an object id xattr for the given path for the specific
+           remote storage */
+        char  *(*get_object_id_xattr_value)( const char *path );
+
+        /* get maximum size of an object id xattr for the given path for the
+           specific remote storage */
+        size_t (*get_object_id_xattr_size) ( void );
 } ops_t;
 
 ops_t  *get_ops();
 
+/*
+ * S3 Protocol Specific Implementation of Function from ops_t.
+ */
 int    s3_connect( void );
 int    s3_download( int fd, const char *object_id );
 int    s3_upload( int fd, const char *object_id );
 void   s3_disconnect( void );
-char  *s3_get_xattr_value( const char *path );
-size_t s3_get_xattr_size( void );
+char  *s3_get_object_id_xattr_value( const char *path );
+size_t s3_get_object_id_xattr_size( void );
 
+
+/**
+ * @brief dowload_file Download file from remote storage to local storage.
+ *
+ * @param[in] path Path to file to download.
+ *
+ * @return  0: file has been successfully dowloaded
+ *         -1: failure happen due dowload of file or
+ *             file is currently being downloaded by another thread
+ */
 int download_file( const char *path );
+
+/**
+ * @brief upload_file Upload file to remote storage from local storage.
+ *
+ * @param[in] path Path to a file to upload.
+ *
+ * @return  0: file has been upload to remote storage properly and truncated
+ *         -1: file has not been upload due to error or access to file
+ *             has happen during eviction
+ */
 int upload_file( const char *path );
-int is_local_file( int fd );
-int is_remote_file( int fd );
-int is_regular_file( int fd );
 
 #endif    /* CLOUDTIERING_OPS_H */

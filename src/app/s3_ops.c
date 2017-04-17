@@ -594,7 +594,7 @@ void s3_disconnect(void) {
         S3_deinitialize();
 }
 
-char *s3_get_xattr_value(const char *path) {
+char *s3_get_object_id_xattr_value(const char *path) {
         /* TODO: implement this function later using near-perfect hash function
                  to compress long paths to keys no more then
                  S3_MAX_KEY_SIZE in length */
@@ -613,6 +613,6 @@ char *s3_get_xattr_value(const char *path) {
         return s3_xattr_buf;
 }
 
-size_t s3_get_xattr_size(void) {
+size_t s3_get_object_id_xattr_size(void) {
         return S3_XATTR_SIZE;
 }
