@@ -37,6 +37,7 @@ Below is a list of tools and libraries that should be installed on the system
 in order to enable code compilation. This list may be incomplete.
 - *s3* shared library (openSUSE 42.2: `libs3-2`, `libs3-devel`);
 - *dotconf* shared library (openSUSE 42.2: `dotconf`, `dotconf-devel`);
+- *attr* tools and libraries enabling work with extended attributes (openSUSE 42.2: `attr`, `libattr1`, `libattr-devel`);
 - *gcc5* compiler (openSUSE 42.2: `gcc5`);
 - *proc* file system should be present on the system.
 
