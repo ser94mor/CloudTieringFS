@@ -15,8 +15,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef CLOUDTIERING_POLICY_H
-#define CLOUDTIERING_POLICY_H
+#ifndef CLOUDTIERING_SCAN_H
+#define CLOUDTIERING_SCAN_H
 
 /*******************************************************************************
 * POLICY                                                                       *
@@ -24,36 +24,8 @@
 * TODO: write description                                                      *
 *******************************************************************************/
 
-#include "defs.h"
 #include "queue.h"
 
-int scan_fs(queue_t *download_queue, queue_t *upload_queue);
+void file_system_scanner(queue_t *demotion_queue, queue_t *promotion_queue);
 
-#define MAX_POLICY_RULE_COUNT  32
-#define MAX_CONDITION_COUNT    32
-#define MAX_ACTION_COUNT       32
-
-#define POLICY_RULES(action,   sep) \
-        action( demote_file )  sep  \
-        action( promote_file )
-
-enum policy_rule_enum {
-        POLICY_RULES(ENUMERIZE,COMMA),
-};
-
-typedef struct {
-        int (*condition[MAX_CONDITION_COUNT])();
-        int (*action[MAX_ACTION_COUNT])();
-        size_t cond_num;
-        size_t action_num;
-        enum policy_rule_enum policy_rule_id;
-} policy_rule_t;
-
-typedef struct {
-        policy_rule_t policy_rule[MAX_POLICY_RULE_COUNT];
-        size_t policy_rule_num;
-} policy_t;
-
-policy_t  *get_policy();
-
-#endif    /* CLOUDTIERING_POLICY_H */
+#endif    /* CLOUDTIERING_SCAN_H */

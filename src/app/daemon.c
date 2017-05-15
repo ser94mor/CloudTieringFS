@@ -25,8 +25,9 @@
 #include "log.h"
 #include "conf.h"
 #include "queue.h"
-#include "policy.h"
+#include "scan.h"
 #include "ops.h"
+#include "policy.h"
 
 /* a helper structure that unites two arbitrary entities */
 typedef struct {
@@ -37,7 +38,7 @@ typedef struct {
 /**
  * TODO: implement thread monitoring
  */
-static void monitor_threads(pthread_t *scan_fs_thread,
+static void monitor_threads(pthread_t *file_system_scanner_thread,
                             pthread_t *dowload_file_thread,
                             pthread_t *upload_file_thread) {
         /* TODO: implement thread monitoring */
@@ -139,13 +140,14 @@ static void *upload_file_routine(void *args) {
 }
 
 /**
- * @brief scan_fs_routine Routine responsible for file system scanning.
+ * @brief file_system_scanner_routine Routine responsible for
+ *                                    file system scanning.
  *
  * @note This function never returns.
  *
  * @param[in] args A pair of upload and download queue pairs.
  */
-static void *scan_fs_routine(void *args) {
+static void *file_system_scanner_routine(void *args) {
         pair_t *dow_upl_pair = args;
         pair_t *dow_queue_pair = dow_upl_pair->first;
         pair_t *upl_queue_pair = dow_upl_pair->second;
@@ -153,21 +155,7 @@ static void *scan_fs_routine(void *args) {
         queue_t *download_queue = dow_queue_pair->second;
         queue_t *upload_queue   = upl_queue_pair->second;
 
-        unsigned long long failure_counter = 0;
-        for (;;) {
-                if (scan_fs(download_queue, upload_queue) == -1) {
-                        /* continue execution even on failure */
-
-                        if ((++failure_counter % 1024) == 0) {
-                                /* periodically report about failures */
-
-                                LOG(DEBUG,
-                                    "failures of %s [counter: %llu]",
-                                    "scan_fs",
-                                    failure_counter);
-                        }
-                }
-        }
+        file_system_scanner(upload_queue, download_queue);
 
         return "unreachable place";
 }
@@ -256,16 +244,16 @@ static int init_data(pair_t *dow_queue_pair,
  *                                 download queues.
  * @param[in] upl_queue_pair       A pair of primary and secondary
  *                                 upload queues.
- * @param[in] scan_fs_thread       Thread id for file system scanner.
- * @param[in] download_file_thread Thread id for download operations.
- * @param[in] upload_file_thread   Thread id for upload operations.
+ * @param[in] file_system_scanner_thread Thread id for file system scanner.
+ * @param[in] download_file_thread       Thread id for download operations.
+ * @param[in] upload_file_thread         Thread id for upload operations.
  *
  * @return  0: when all threads have been successfully started
  *         -1: when at least one thread was not started
  */
 static int start_routines(pair_t    *dow_queue_pair,
                           pair_t    *upl_queue_pair,
-                          pthread_t *scan_fs_thread,
+                          pthread_t *file_system_scanner_thread,
                           pthread_t *download_file_thread,
                           pthread_t *upload_file_thread) {
         int ret;
@@ -274,14 +262,14 @@ static int start_routines(pair_t    *dow_queue_pair,
                 .first = dow_queue_pair,
                 .second = upl_queue_pair,
         };
-        ret = pthread_create(scan_fs_thread,
+        ret = pthread_create(file_system_scanner_thread,
                              NULL,
-                             scan_fs_routine,
+                             file_system_scanner_routine,
                              &dow_upl_pair);
         if (ret != 0) {
                 /* ret is errno in this case */
                 LOG(ERROR,
-                    "pthread_create for scan_fs_routine failed "
+                    "pthread_create for file_system_scanner_routine failed "
                     "[reason: %s]",
                     strerror(ret));
                 return -1;
@@ -334,7 +322,7 @@ int main(int argc, char *argv[]) {
 
         /* thread that should scan file system and add elements to download
            and upload queues */
-        pthread_t scan_fs_thread;
+        pthread_t file_system_scanner_thread;
 
         /* thread that should move files from remote storage to local */
         pthread_t download_file_thread;
@@ -370,13 +358,13 @@ int main(int argc, char *argv[]) {
         /* start all routines composing business logic of this program */
         if (start_routines(&dow_queue_pair,
                            &upl_queue_pair,
-                           &scan_fs_thread,
+                           &file_system_scanner_thread,
                            &download_file_thread,
                            &upload_file_thread) == -1) {
                 return EXIT_FAILURE;
         }
 
-        monitor_threads(&scan_fs_thread,
+        monitor_threads(&file_system_scanner_thread,
                         &download_file_thread,
                         &upload_file_thread);
 

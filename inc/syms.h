@@ -32,6 +32,8 @@ typedef struct {
 
     int (*truncate)( const char *, off_t );
 
+    /* TODO: add stat(2) fstatat(2) */
+
     FILE *(*fopen)( const char *, const char * );
     FILE *(*freopen)( const char *, const char *, FILE * );
 } symbols_t;
