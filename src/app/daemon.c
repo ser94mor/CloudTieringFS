@@ -25,8 +25,8 @@
 #include "log.h"
 #include "conf.h"
 #include "queue.h"
-#include "scan.h"
-#include "ops.h"
+#include "fs_scanner.h"
+#include "data_mover.h"
 #include "policy.h"
 
 /* a helper structure that unites two arbitrary entities */

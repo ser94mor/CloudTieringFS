@@ -28,11 +28,10 @@
 #include <sys/resource.h>
 
 #include "log.h"
-#include "ops.h"
 #include "conf.h"
 #include "queue.h"
 #include "file.h"
-#include "scan.h"
+#include "fs_scanner.h"
 
 /***********************
  * File System Scanner *

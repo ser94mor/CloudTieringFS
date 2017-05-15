@@ -24,18 +24,17 @@
 * TODO: write description                                                      *
 *******************************************************************************/
 
-#include "defs.h"
-#include "queue.h"
+#include <sys/types.h>
 
-int scan_fs(queue_t *download_queue, queue_t *upload_queue);
+#include "defs.h"
 
 #define MAX_POLICY_RULE_COUNT  32
 #define MAX_CONDITION_COUNT    32
 #define MAX_ACTION_COUNT       32
 
-#define POLICY_RULES(action,   sep) \
-        action( demote_file )  sep  \
-        action( promote_file )
+#define POLICY_RULES(action,   sep)           \
+        action( file_demotion_policy  )  sep  \
+        action( file_promotion_policy )
 
 enum policy_rule_enum {
         POLICY_RULES(ENUMERIZE,COMMA),

@@ -27,7 +27,8 @@
 #include <dotconf.h>
 
 #include "conf.h"
-#include "ops.h"
+#include "data_mover.h"
+#include "s3_interface.h"
 #include "log.h"
 #include "log_internal.h"
 

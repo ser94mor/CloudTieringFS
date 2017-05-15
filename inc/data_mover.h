@@ -20,7 +20,7 @@
 #define CLOUDTIERING_OPS_H
 
 /*******************************************************************************
-* OPERATIONS                                                                   *
+* DATA MOVER                                                                   *
 * ----------                                                                   *
 *                                                                              *
 * TODO: write description                                                      *
@@ -79,16 +79,6 @@ typedef struct {
 } ops_t;
 
 ops_t  *get_ops();
-
-/*
- * S3 Protocol Specific Implementation of Function from ops_t.
- */
-int    s3_connect( void );
-int    s3_download( int fd, const char *object_id );
-int    s3_upload( int fd, const char *object_id );
-void   s3_disconnect( void );
-char  *s3_get_object_id_xattr_value( const char *path );
-size_t s3_get_object_id_xattr_size( void );
 
 
 /**

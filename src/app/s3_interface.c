@@ -26,7 +26,7 @@
 #include <attr/xattr.h>
 #include <libs3.h>
 
-#include "ops.h"
+#include "s3_interface.h"
 #include "conf.h"
 #include "log.h"
 

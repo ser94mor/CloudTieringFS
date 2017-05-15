@@ -25,7 +25,6 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-#include "ops.h"
 #include "log.h"
 #include "file.h"
 
