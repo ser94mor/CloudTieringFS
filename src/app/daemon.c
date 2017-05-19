@@ -15,12 +15,17 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#define _POSIX_C_SOURCE  200112L
+
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
 #include <time.h>
 #include <stdio.h>
 #include <pthread.h>
+#include <dirent.h>
+#include <libgen.h>
+#include <unistd.h>
 
 #include "log.h"
 #include "conf.h"
@@ -89,6 +94,49 @@ static void *transfer_files_loop(pair_t *pair,
                         /* both queues are empty */
                         pthread_testcancel();
                         continue;
+                }
+
+                if (path[1] == 'p' &&
+                    path[2] == 'r' &&
+                    path[3] == 'o' &&
+                    path[4] == 'c') {
+
+                        char real_path[get_conf()->path_max];
+                        for (int i = 0; i < get_conf()->path_max; i++) {
+                                real_path[0] = '\0';
+                        }
+
+                        if (readlink(path, real_path, get_conf()->path_max) == -1) {
+                                LOG(ERROR, "failed to readlink of %s", path);
+                        } else {
+                                queue_push(primary_queue, real_path, strlen(real_path) + 1);
+                                LOG(DEBUG, "readlink( %s ) == %s", path,
+                                    real_path);
+                                DIR *dir;
+                                struct dirent *ent;
+                                char dir_name[PATH_MAX];
+                                strcpy(dir_name, dirname(real_path));
+                                if ((dir = opendir (dir_name)) != NULL) {
+                                        while ((ent = readdir (dir)) != NULL) {
+                                                if (ent->d_name[0] == '.') {
+                                                        continue;
+                                                }
+
+                                                char next_path[PATH_MAX];
+                                                sprintf(next_path, "%s/%s", dir_name, ent->d_name);
+
+
+                                                queue_try_push(secondary_queue, next_path, strlen(next_path) + 1);
+                                        }
+                                        closedir (dir);
+                                } else {
+                                        /* could not open directory */
+                                        LOG(ERROR,
+                                            "failured to open directory %s",
+                                            dir_name);
+                                }
+                        }
+
                 }
 
                 if (action(path) == -1) {
@@ -248,6 +296,8 @@ static int init_data(pair_t *dow_queue_pair,
         return 0;
 }
 
+pthread_t download_tread_arr[10];
+
 /**
  * @brief start_routines Start threads for (1) file system scanner,
  *                       (2) download operations and (3) upload operations.
@@ -287,17 +337,19 @@ static int start_routines(pair_t    *dow_queue_pair,
                 return -1;
         }
 
-        ret = pthread_create(download_file_thread,
-                             NULL,
-                             download_file_routine,
-                             dow_queue_pair);
-        if (ret != 0) {
-                /* ret is errno in this case */
-                LOG(ERROR,
-                    "pthread_create for download_file_routine failed "
-                    "[reason: %s]",
-                    strerror(ret));
-                return -1;
+        for (int i = 0; i < 10; i++) {
+                ret = pthread_create(&download_tread_arr[i],
+                                     NULL,
+                                     download_file_routine,
+                                     dow_queue_pair);
+                if (ret != 0) {
+                        /* ret is errno in this case */
+                        LOG(ERROR,
+                        "pthread_create for download_file_routine failed "
+                        "[reason: %s]",
+                        strerror(ret));
+                        return -1;
+                }
         }
 
         ret = pthread_create(upload_file_thread,
@@ -310,7 +362,7 @@ static int start_routines(pair_t    *dow_queue_pair,
                     "pthread_create for upload_file_routine failed "
                     "[reason: %s]",
                     strerror(ret));
-                return -1;
+                    return -1;
         }
 
         return 0;

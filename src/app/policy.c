@@ -37,7 +37,7 @@
  * Scan filesystem *
  * *****************/
 
-#define EVICTION_TIMEOUT    30
+#define EVICTION_TIMEOUT    9999999999
 
 static queue_t *in_queue  = NULL;
 static queue_t *out_queue = NULL;
