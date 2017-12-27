@@ -7,7 +7,7 @@ semantics.
 
 ### Warning
 Do not use this software on your production cluster.
-**cloudtiering** is under active development and hence unstable.
+CloudTieringFS is under active development and hence unstable.
 There is a risk of a data corruption.
 
 Nevertheless, curious minds are welcome to try it on their test clusters.
@@ -42,6 +42,5 @@ in order to enable code compilation. This list may be incomplete.
 
 
 ### Licensing
-**cloudtiering** is licensed under the
+CloudTieringFS is licensed under the
 [GNU General Public License, Version 3](LICENSE.md).
-
