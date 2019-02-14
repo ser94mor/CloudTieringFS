@@ -3,3 +3,4 @@
 *.kate-swp
 bin/
 src/tst/pjd-fstest/fstest
+.idea/
