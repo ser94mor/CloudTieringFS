@@ -4,14 +4,9 @@ between a POSIX-compliant file system (local or distributed)
 and a cloud object storage at the file level while maintaining the POSIX
 semantics.
 
-
-### Warning
-Do not use this software on your production cluster.
-CloudTieringFS is under active development and hence unstable.
-There is a risk of a data corruption.
-
-Nevertheless, curious minds are welcome to try it on their test clusters.
-
+### Documentation
+A very detailed description of the CloudTieringFS is given in 
+[Sergey Morozov's Master's Thesis](docs/sergey-morozov-masters-thesis.pdf).
 
 ### Installation
 To start daemon run:
