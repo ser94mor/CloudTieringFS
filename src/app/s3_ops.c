@@ -181,7 +181,6 @@ static void s3_init_globals(void) {
         g_bucket_context.uriStyle        = S3UriStylePath;
         g_bucket_context.accessKeyId     = conf->s3_access_key_id;
         g_bucket_context.secretAccessKey = conf->s3_secret_access_key;
-        g_bucket_context.securityToken   = NULL;
 }
 
 /**
@@ -207,7 +206,6 @@ static int s3_bucket_exists(void) {
                                S3UriStylePath,
                                g_bucket_context.accessKeyId,
                                g_bucket_context.secretAccessKey,
-                               NULL,
                                g_bucket_context.hostName,
                                g_bucket_context.bucketName,
                                sizeof(location_constraint),
@@ -240,7 +238,6 @@ static int s3_create_bucket(void) {
                 S3_create_bucket(g_bucket_context.protocol,
                                  g_bucket_context.accessKeyId,
                                  g_bucket_context.secretAccessKey,
-                                 NULL,
                                  g_bucket_context.hostName,
                                  g_bucket_context.bucketName,
                                  S3CannedAclPrivate,

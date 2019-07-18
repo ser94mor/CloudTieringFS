@@ -36,7 +36,7 @@
 #define SHM_OBJ           "/cloudtiering-shm-obj-test"
 
 #define ITERATIONS_PER_THREAD    500000
-#define COND_WAIT_SECS_THREAD    5
+#define COND_WAIT_SECS_THREAD    10
 #define THREAD_JOIN_TIMEOUT      3
 #define DATA_STR_THREAD          "data"
 #define DATA_STR_LEN_THREAD      5
@@ -465,9 +465,8 @@ static int wait_and_validate_private(char *err_msg,
                         if (retval == PTHREAD_CANCELED) {
                                 retval = "cancelled";
                         }
-                        sprintf(err_msg,
-                                "%s [1st consumer: %s]",
-                                err_msg,
+                        sprintf(err_msg + strlen(err_msg),
+                                " [1st consumer: %s]",
                                 retval);
                 }
                 retval = NULL;
@@ -484,9 +483,8 @@ static int wait_and_validate_private(char *err_msg,
                         if (retval == PTHREAD_CANCELED) {
                                 retval = "cancelled";
                         }
-                        sprintf(err_msg,
-                                "%s [1st supplier: %s]",
-                                err_msg,
+                        sprintf(err_msg + strlen(err_msg),
+                                " [1st supplier: %s]",
                                 retval);
                 }
                 retval = NULL;
@@ -503,9 +501,8 @@ static int wait_and_validate_private(char *err_msg,
                         if (retval == PTHREAD_CANCELED) {
                                 retval = "cancelled";
                         }
-                        sprintf(err_msg,
-                                "%s [2nd consumer: %s]",
-                                err_msg,
+                        sprintf(err_msg + strlen(err_msg),
+                                " [2nd consumer: %s]",
                                 retval);
                 }
                 retval = NULL;
@@ -522,9 +519,8 @@ static int wait_and_validate_private(char *err_msg,
                         if (retval == PTHREAD_CANCELED) {
                                 retval = "cancelled";
                         }
-                        sprintf(err_msg,
-                                "%s [2nd supplier: %s]",
-                                err_msg,
+                        sprintf(err_msg + strlen(err_msg),
+                                " [2nd supplier: %s]",
                                 retval);
                 }
                 retval = NULL;

@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#define  _BSD_SOURCE        /* needed for MAP_ANONYMOUS from sys/mman.h */
+#define  _DEFAULT_SOURCE        /* needed for MAP_ANONYMOUS from sys/mman.h */
 
 #include <stdio.h>
 #include <stdlib.h>

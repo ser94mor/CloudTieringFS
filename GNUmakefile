@@ -15,10 +15,11 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.       #
 ################################################################################
 
+SHELL = /bin/bash
+
 #
 # Single makefile to build all components of cloudtiering.
 #
-
 
 ### versions
 MAJOR_VER := 0
@@ -72,7 +73,7 @@ tst_DEP := ${app_DEP}
 
 
 ### compiler
-CC                   := gcc-5
+CC                   := gcc
 CC_FLAGS_CMPL_COMMON := -g -c -Wall -pthread -std=c11 -O3 -I${INC_DIR}
 CC_FLAGS_LNK_COMMON  := -g -pthread
 
@@ -108,7 +109,7 @@ ${BIN_DIR}/%.o: $$(call choose_file,$$(*D),$$(*F)) | ${BIN_DIR}/$$(*D)
 
 
 ${BIN_DIR}/%.out: $${$$(*D)_OBJ} | ${BIN_DIR}/$$(*D)
-	${CC} ${$(*D)_CC_FLAGS_LNK} -o $@ $^
+	${CC} -o $@ $^ ${$(*D)_CC_FLAGS_LNK}
 
 
 $(addprefix ${BIN_DIR}/,app lib tst validate):
